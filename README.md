@@ -1,10 +1,10 @@
 # Intersect
 
-**Where images overlap, a third image appears.**
+**The overlap is the art.**
 
-![Intersect: three images on a grid, with their overlaps redrawn as dot matrix](docs/screenshot.png)
+![Intersect: three images on a grid, with only their overlaps redrawn as dot matrix](docs/screenshot.png)
 
-Intersect is a browser tool for making posters and social visuals. Pick a canvas size, add your images, and move them around the grid. Wherever they overlap, that region is redrawn as something new: dot matrix, ASCII, braille, dithering, hatching and more. The shape comes from one image and the color from the other.
+Most image effects change the whole picture. Intersect only touches the places where your images overlap. Pick a canvas size, add your images and move them around the grid. Every intersection turns into its own piece of art (dot matrix, ASCII, braille, dithering, hatching and more), while the rest of each image stays exactly as it was. Inside the overlap, the shape can come from one image and the color from the other.
 
 Everything runs in your browser. Images never leave your device, and there's nothing to sign up for.
 

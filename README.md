@@ -2,6 +2,8 @@
 
 **Where images overlap, a third image appears.**
 
+![Intersect: three images on a grid, with their overlaps redrawn as dot matrix](docs/screenshot.png)
+
 Intersect is a browser tool for making posters and social visuals. Drop images onto a grid and move them around. Wherever they overlap, that region is redrawn as something new: dot matrix, ASCII, braille, dithering, hatching and more. The shape comes from one image and the color from the other.
 
 Everything runs in your browser. Images never leave your device, and there's nothing to sign up for.
@@ -53,6 +55,7 @@ The site is static, so any static host works. On Vercel:
 ## Project structure
 
 ```
-index.html    the whole app: markup, styles and script
-favicon.svg   browser tab icon
+index.html          the whole app: markup, styles and script
+favicon.svg         browser tab icon
+docs/screenshot.png README screenshot
 ```

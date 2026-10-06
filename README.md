@@ -4,7 +4,7 @@
 
 ![Intersect: three images on a grid, with their overlaps redrawn as dot matrix](docs/screenshot.png)
 
-Intersect is a browser tool for making posters and social visuals. Drop images onto a grid and move them around. Wherever they overlap, that region is redrawn as something new: dot matrix, ASCII, braille, dithering, hatching and more. The shape comes from one image and the color from the other.
+Intersect is a browser tool for making posters and social visuals. Pick a canvas size, add your images, and move them around the grid. Wherever they overlap, that region is redrawn as something new: dot matrix, ASCII, braille, dithering, hatching and more. The shape comes from one image and the color from the other.
 
 Everything runs in your browser. Images never leave your device, and there's nothing to sign up for.
 
@@ -20,12 +20,19 @@ Everything runs in your browser. Images never leave your device, and there's not
 - **Motion:** Breathe, Wave, Scan, Drift and Glitch, plus images that hop across the grid.
 - **Finish:** scan lines, RGB split, film grain and vignette.
 - **Any canvas size:** Instagram post, story, square, landscape, A4/A3 poster, X header or custom.
-- **Grid tools:**
+- **Grid menu in the top bar:**
   - Adjustable grid size with snapping
   - Figma-style grid lines (never exported)
   - Background dots
 - **Cropping:** double-click an image to crop it on the canvas. Drag to reposition and scroll to zoom.
 - **Export:** PNG at full resolution, or a seamlessly looping video. You can download, copy, or share to WhatsApp and Instagram.
+
+## Layout
+
+- **Left panel:** Effect and Motion (styles, blend modes, effect controls, finish, animation and recording).
+- **Center:** the poster.
+- **Right panel:** Images and Color (layers, cropping, mark colors, surfaces).
+- **Top bar:** canvas size, grid settings, Record loop and Export.
 
 ## Keyboard
 
@@ -56,6 +63,6 @@ The site is static, so any static host works. On Vercel:
 
 ```
 index.html          the whole app: markup, styles and script
-favicon.svg         browser tab icon
+favicon.svg         browser tab icon (plus favicon-32.png and apple-touch-icon.png)
 docs/screenshot.png README screenshot
 ```

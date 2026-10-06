@@ -8,7 +8,9 @@
 <meta name="theme-color" content="#08080a">
 <meta property="og:title" content="Intersect">
 <meta property="og:description" content="Where images overlap, a third image appears.">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png?v=3" sizes="32x32" type="image/png">
+<link rel="icon" href="favicon.svg?v=3" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Martian+Mono:wght@400;500;600&display=swap">
@@ -53,15 +55,20 @@ button { -webkit-tap-highlight-color: transparent; }
 .app {
   height: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: 296px minmax(0, 1fr) 296px;
   grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "header header header" "left stage right";
   padding-block: env(safe-area-inset-top, 0px) env(safe-area-inset-bottom, 0px);
 }
+header { grid-area: header; }
+.rail.left { grid-area: left; border-right: 1px solid var(--line); }
+.rail.right { grid-area: right; border-left: 1px solid var(--line); }
+.stage { grid-area: stage; }
 
 /* ---------- top bar ---------- */
 header {
-  grid-column: 1 / -1;
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  position: relative; z-index: 5;
   padding: 10px 16px;
   border-bottom: 1px solid var(--line);
 }
@@ -69,13 +76,28 @@ header {
 .mark { width: 20px; height: 20px; display: block; }
 .mark rect { fill: none; stroke: currentColor; stroke-width: 1.5; }
 .mark .x { fill: currentColor; stroke: none; }
-.tag { font-family: var(--font-label); font-size: 9.5px; letter-spacing: 0.08em; color: var(--dim); padding-right: 6px; border-right: 1px solid var(--line); line-height: 20px; padding-inline: 2px 14px; }
+.hdiv { width: 1px; height: 20px; background: var(--line); margin-inline: 8px; }
 .sizebtn {
   font-family: var(--font-label); font-size: 10.5px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums;
   background: none; border: 1px solid var(--line); padding: 6px 10px; border-radius: var(--r); cursor: pointer;
   display: inline-flex; gap: 10px; align-items: center;
 }
 .sizebtn .ratio { color: var(--dim); }
+.sizebtn[aria-expanded="true"] { background: var(--fg); border-color: var(--fg); color: var(--ink); }
+.sizebtn[aria-expanded="true"]::after { border-color: var(--ink); transform: translateY(1px) rotate(225deg); }
+
+/* grid popover: scales from its trigger */
+.pop-wrap { position: relative; }
+.popover {
+  position: absolute; top: calc(100% + 8px); left: 0; width: 300px; max-height: calc(100vh - 80px); overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: 4px; padding: 18px 16px;
+  display: flex; flex-direction: column; gap: 22px;
+  box-shadow: 0 24px 60px -12px rgba(0,0,0,0.85);
+  transform-origin: top left; transform: scale(1); opacity: 1;
+  transition: transform 180ms var(--ease-out), opacity 180ms var(--ease-out);
+}
+@starting-style { .popover { transform: scale(0.97); opacity: 0; } }
+.popover.closing { transform: scale(0.98); opacity: 0; transition-duration: 120ms; }
 .sizebtn::after { content: ""; width: 5px; height: 5px; border-right: 1px solid var(--muted); border-bottom: 1px solid var(--muted); transform: translateY(-2px) rotate(45deg); }
 .spacer { flex: 1; }
 
@@ -84,6 +106,31 @@ header {
 .canvas-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; }
 .canvas-wrap canvas { max-width: 100%; max-height: 100%; width: auto; height: auto; display: block; touch-action: none; background: #000; box-shadow: 0 0 0 1px var(--line), 0 30px 80px -20px rgba(0,0,0,0.9); }
 .frame { position: absolute; pointer-events: none; }
+.frame .meta, .frame .cm { pointer-events: none; }
+
+/* empty canvas: invite the first images */
+.empty-state {
+  position: absolute; inset: 0; pointer-events: auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; text-align: center;
+  opacity: 1; transform: translateY(0); transition: opacity 320ms var(--ease-out), transform 320ms var(--ease-out);
+}
+@starting-style { .empty-state { opacity: 0; transform: translateY(6px); } }
+.empty-state .es-mark { width: 40px; height: 40px; color: var(--fg); margin-bottom: 6px; }
+.es-mark rect { fill: none; stroke: currentColor; stroke-width: 1; }
+.es-mark .x { fill: currentColor; stroke: none; }
+.empty-state h3 { margin: 0; font-size: 17px; font-weight: 500; letter-spacing: -0.01em; }
+.empty-state p { margin: 0; color: var(--muted); font-size: 12.5px; max-width: 30ch; }
+.empty-state .btn { margin-top: 8px; }
+.empty-state .es-sub { font-size: 11.5px; color: var(--dim); max-width: none; }
+.link { background: none; border: 0; padding: 0; color: var(--fg); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; cursor: pointer; font-size: inherit; transition: text-decoration-color 150ms ease; }
+.one-more {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); pointer-events: auto;
+  display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100% - 24px);
+  background: rgba(14,14,14,0.92); border: 1px solid var(--line-2); border-radius: 4px; padding: 8px 8px 8px 14px;
+  font-size: 12px; color: var(--muted); box-shadow: 0 16px 40px -10px rgba(0,0,0,0.8);
+  opacity: 1; transition: opacity 240ms var(--ease-out), transform 240ms var(--ease-out);
+}
+@starting-style { .one-more { opacity: 0; transform: translate(-50%, 6px); } }
 .frame .meta { position: absolute; bottom: calc(100% + 10px); font-family: var(--font-label); font-size: 9.5px; letter-spacing: 0.08em; color: var(--dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .frame .meta.l { left: 0; }
 .frame .meta.r { right: 0; }
@@ -104,11 +151,11 @@ kbd { font-family: var(--font-mono); font-size: 10px; color: var(--fg); border: 
 }
 
 /* ---------- control rail ---------- */
-aside { min-height: 0; display: flex; flex-direction: column; border-left: 1px solid var(--line); background: var(--surface); }
-.tabs { display: grid; grid-template-columns: repeat(5, 1fr); border-bottom: 1px solid var(--line); position: relative; }
+.rail { min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--surface); }
+.tabs { display: grid; grid-template-columns: repeat(var(--n, 2), 1fr); border-bottom: 1px solid var(--line); position: relative; flex: none; }
 .tabs button { background: none; border: 0; padding: 13px 2px 12px; cursor: pointer; color: var(--muted); font-family: var(--font-label); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; }
 .tabs button[aria-selected="true"] { color: var(--fg); }
-.tab-ind { position: absolute; left: 0; bottom: -1px; width: 20%; height: 1px; background: var(--fg); transition: transform 200ms var(--ease-in-out); }
+.tab-ind { position: absolute; left: 0; bottom: -1px; width: calc(100% / var(--n, 2)); height: 1px; background: var(--fg); transition: transform 200ms var(--ease-in-out); }
 .tab-ind.no-anim { transition: none; }
 .panel { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 26px; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
 section { display: flex; flex-direction: column; gap: 12px; }
@@ -124,6 +171,7 @@ section { display: flex; flex-direction: column; gap: 12px; }
 .seg { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 4px; }
 .seg button { background: var(--raised); border: 1px solid var(--line); padding: 8px 4px; cursor: pointer; font-size: 12px; border-radius: var(--r); color: var(--muted); }
 .seg button[aria-pressed="true"] { background: var(--fg); border-color: var(--fg); color: var(--ink); font-weight: 500; }
+.seg button.wide { grid-column: span 2; }
 .seg button .glyph { display: block; font-family: var(--font-mono); font-size: 15px; line-height: 1.2; margin-bottom: 3px; color: var(--fg); }
 .seg button[aria-pressed="true"] .glyph { color: var(--ink); }
 
@@ -200,6 +248,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
   .preset:hover { box-shadow: 0 0 0 1px var(--fg); }
   .sizecard:hover:not([aria-pressed="true"]) { border-color: var(--line-2); background: var(--hover); }
   .stop button:not(:disabled):hover { color: var(--fg); }
+  .link:hover { text-decoration-color: var(--fg); }
 }
 
 /* ---------- dialogs ---------- */
@@ -253,16 +302,24 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
   @starting-style { .modal-card { transform: none; } }
   .toast { transform: translate(-50%, 0); transition: opacity 200ms ease; }
   .tab-ind { transition: none; }
+  .popover, .popover.closing { transform: none; transition: opacity 150ms ease; }
+  @starting-style { .popover { transform: none; } .empty-state { transform: none; } .one-more { transform: translateX(-50%); } }
   .btn:active, .seg button:active, .sizebtn:active, .sizecard:active, .preset:active, .iconbtn:active, .layer .acts button:active { transform: none; }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1100px) {
   html, body { height: auto; }
-  .app { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
+  .app { height: auto; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto auto; grid-template-areas: "header header" "stage stage" "left right"; }
   .stage { height: 74vh; }
-  aside { border-left: 0; border-top: 1px solid var(--line); }
+  .rail.left, .rail.right { border-top: 1px solid var(--line); }
   .panel { overflow: visible; }
-  .tag { display: none; }
+}
+@media (max-width: 700px) {
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "header" "stage" "right" "left"; }
+  .rail.left { border-right: 0; }
+  .rail.right { border-left: 0; }
+  .hdiv { display: none; }
+  .popover { position: fixed; top: 64px; left: 16px; right: 16px; width: auto; }
 }
 </style>
 </head>
@@ -270,32 +327,154 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
 <div class="app">
   <header>
     <div class="brand"><svg class="mark" viewBox="0 0 20 20" aria-hidden="true"><rect x="1.5" y="1.5" width="11" height="11"/><rect x="7.5" y="7.5" width="11" height="11"/><rect class="x" x="7.5" y="7.5" width="5" height="5"/></svg><span>INTERSECT</span></div>
-    <span class="tag">v0.4</span>
+    <span class="hdiv" aria-hidden="true"></span>
     <button class="sizebtn" id="sizeBtn" type="button" title="Change canvas size"><span id="sizeLabel">1080 × 1350</span><span class="ratio" id="ratioLabel">4:5</span></button>
+    <div class="pop-wrap">
+      <button class="sizebtn" id="gridBtn" type="button" aria-expanded="false" aria-controls="gridPop">Grid</button>
+      <div class="popover" id="gridPop" hidden>
+        <section>
+          <div class="sec-title"><span>Grid</span></div>
+          <div class="field"><label for="grid">Grid size <span class="val" id="gridV"></span></label><input id="grid" type="range" min="10" max="240" step="5"></div>
+          <p class="note">Smaller cells give more dots on the background and finer snapping.</p>
+          <label class="check"><input type="checkbox" id="snap"><span>Snap images to grid</span></label>
+          <label class="check"><input type="checkbox" id="lines"><span>Show grid lines<small>Editing aid like Figma or Photoshop. Never exported.</small></span></label>
+          <div class="field indent"><label for="major">Major line every <span class="val" id="majorV"></span></label><input id="major" type="range" min="1" max="12"></div>
+        </section>
+
+        <section>
+          <div class="sec-title"><span>Poster details</span><span>exported</span></div>
+          <label class="check"><input type="checkbox" id="dots"><span>Background dots</span></label>
+          <div class="field indent"><label for="dotSize">Dot size <span class="val" id="dotSizeV"></span></label><input id="dotSize" type="range" min="1" max="10"></div>
+          <label class="check"><input type="checkbox" id="guides"><span>Labels and dashed guides</span></label>
+        </section>
+      </div>
+    </div>
     <span class="spacer"></span>
     <button class="btn rec" id="recordBtn" type="button">Record loop</button>
     <button class="btn primary" id="export" type="button">Export PNG</button>
   </header>
 
+  <aside class="rail left" aria-label="Effects and motion">
+    <div class="tabs" role="tablist" data-group="fx" style="--n:2">
+      <button type="button" role="tab" id="tab-effect" aria-controls="p-effect" data-tab="effect">Effect</button>
+      <button type="button" role="tab" id="tab-motion" aria-controls="p-motion" data-tab="motion">Motion</button>
+      <span class="tab-ind no-anim" aria-hidden="true"></span>
+    </div>
+    <div class="panel" role="tabpanel" id="p-effect" aria-labelledby="tab-effect">
+
+      <section>
+        <div class="sec-title"><span>Overlap style</span></div>
+        <div class="seg" id="style" style="--cols:4">
+          <button type="button" data-v="dots"><span class="glyph">◎•</span>Dots</button>
+          <button type="button" data-v="ascii"><span class="glyph">#%:</span>ASCII</button>
+          <button type="button" data-v="waves"><span class="glyph">∿∿</span>Waves</button>
+          <button type="button" data-v="vectors"><span class="glyph">⟋⟍</span>Vectors</button>
+          <button type="button" data-v="truchet"><span class="glyph">◜◞</span>Truchet</button>
+          <button type="button" data-v="bars"><span class="glyph">▁▅█</span>Bars</button>
+          <button type="button" data-v="crosses"><span class="glyph">+ ✚</span>Crosses</button>
+          <button type="button" data-v="squares"><span class="glyph">▪■</span>Squares</button>
+          <button type="button" data-v="braille"><span class="glyph">⠿⠇</span>Braille</button>
+          <button type="button" data-v="blocks"><span class="glyph">░▒▓</span>Blocks</button>
+          <button type="button" data-v="dither"><span class="glyph">▚▞</span>Dither</button>
+          <button type="button" data-v="hex"><span class="glyph">⬡⬢</span>Hex</button>
+          <button type="button" data-v="led"><span class="glyph">●○</span>LED</button>
+          <button type="button" data-v="hatch"><span class="glyph">╱╳</span>Hatch</button>
+          <button type="button" data-v="rgb"><span class="glyph">∴</span>RGB</button>
+          <button type="button" data-v="rings"><span class="glyph">◎◉</span>Rings</button>
+        </div>
+        <label class="check"><input type="checkbox" id="depthVary">
+          <span>Change style with overlap depth<small>Two layers use the chosen style; three layers use the next one, and so on.</small></span>
+        </label>
+      </section>
+
+      <section>
+        <div class="sec-title"><span>How images combine</span></div>
+        <div class="seg" id="blend" style="--cols:3">
+          <button type="button" class="wide" data-v="shape" title="Shape from the top image, color from the one below">Shape × Color</button>
+          <button type="button" data-v="top" title="The top image is converted">Top layer</button>
+          <button type="button" data-v="plus" title="Images add up (screen)">Plus</button>
+          <button type="button" data-v="minus" title="Top minus the one below">Minus</button>
+          <button type="button" data-v="diff" title="Only where the images differ">Difference</button>
+        </div>
+      </section>
+
+      <section>
+        <div class="sec-title"><span>Effect controls</span></div>
+        <div class="field"><label for="amount">Effect amount <span class="val" id="amountV"></span></label><input id="amount" type="range" min="0" max="100"></div>
+        <div class="field"><label for="cell">Cell size <span class="val" id="cellV"></span></label><input id="cell" type="range" min="4" max="120"></div>
+        <div class="field"><label for="threshold">Drop dark cells <span class="val" id="thresholdV"></span></label><input id="threshold" type="range" min="0" max="80"></div>
+        <div class="field"><label for="contrast">Contrast <span class="val" id="contrastV"></span></label><input id="contrast" type="range" min="50" max="300"></div>
+        <label class="check"><input type="checkbox" id="invert"><span>Invert brightness</span></label>
+      </section>
+
+      <section>
+        <div class="sec-title"><span>Finish</span><span>whole poster</span></div>
+        <div class="field"><label for="scanFx">Scan lines <span class="val" id="scanFxV"></span></label><input id="scanFx" type="range" min="0" max="100"></div>
+        <div class="field"><label for="rgbFx">RGB split <span class="val" id="rgbFxV"></span></label><input id="rgbFx" type="range" min="0" max="100"></div>
+        <div class="field"><label for="grainFx">Film grain <span class="val" id="grainFxV"></span></label><input id="grainFx" type="range" min="0" max="100"></div>
+        <div class="field"><label for="vigFx">Vignette <span class="val" id="vigFxV"></span></label><input id="vigFx" type="range" min="0" max="100"></div>
+      </section>
+    </div>
+    <div class="panel" role="tabpanel" id="p-motion" aria-labelledby="tab-motion" hidden>
+
+      <section>
+        <div class="sec-title"><span>Overlap motion</span></div>
+        <div class="seg" id="motion" style="--cols:3">
+          <button type="button" data-v="off">Off</button>
+          <button type="button" data-v="breathe">Breathe</button>
+          <button type="button" data-v="wave">Wave</button>
+          <button type="button" data-v="scan">Scan</button>
+          <button type="button" data-v="drift">Drift</button>
+          <button type="button" data-v="glitch">Glitch</button>
+        </div>
+        <p class="note" id="motionNote"></p>
+        <div class="field"><label for="motionAmt">Motion strength <span class="val" id="motionAmtV"></span></label><input id="motionAmt" type="range" min="0" max="100"></div>
+        <div class="field"><label for="loop">Loop length <span class="val" id="loopV"></span></label><input id="loop" type="range" min="2" max="16"></div>
+      </section>
+
+      <section>
+        <div class="sec-title"><span>Image motion</span></div>
+        <div class="field"><label for="hop">Move images <span class="val" id="hopV"></span></label><input id="hop" type="range" min="0" max="4"></div>
+        <p class="note">Images hop across the grid, so the overlaps keep changing shape.</p>
+      </section>
+
+      <section>
+        <div class="row"><button class="btn" id="playBtn" type="button">Pause</button></div>
+        <div class="sec-title"><span>Record</span></div>
+        <p class="note">Records exactly one loop at full canvas size, so the clip repeats seamlessly.</p>
+        <div class="row"><button class="btn rec" id="recordBtn2" type="button">Record loop</button></div>
+        <div class="status" id="recStatus"></div>
+      </section>
+    </div>
+  </aside>
+
   <div class="stage" id="stage">
     <div class="canvas-wrap"><canvas id="cv" width="1080" height="1350" aria-label="Poster canvas"></canvas>
-      <div class="frame" id="frame" aria-hidden="true"><span class="meta l" id="frameDim"></span><span class="meta r" id="frameZoom"></span><i class="cm tl"></i><i class="cm tr"></i><i class="cm bl"></i><i class="cm br"></i></div>
+      <div class="frame" id="frame"><span class="meta l" id="frameDim" aria-hidden="true"></span><span class="meta r" id="frameZoom" aria-hidden="true"></span><i class="cm tl"></i><i class="cm tr"></i><i class="cm bl"></i><i class="cm br"></i>
+        <div class="empty-state" id="emptyState" hidden>
+          <svg class="es-mark" viewBox="0 0 20 20" aria-hidden="true"><rect x="1.5" y="1.5" width="11" height="11"/><rect x="7.5" y="7.5" width="11" height="11"/><rect class="x" x="7.5" y="7.5" width="5" height="5"/></svg>
+          <h3>Add two images to begin</h3>
+          <p>Where they overlap, a third image appears.</p>
+          <label class="btn primary" for="file">Add images</label>
+          <p class="es-sub">or drop or paste them here · <button type="button" class="link" id="useSamples">try sample images</button></p>
+        </div>
+        <div class="one-more" id="oneMore" hidden>
+          <span>Add one more image. The effect appears where they overlap.</span>
+          <label class="btn small primary" for="file">Add image</label>
+        </div>
+      </div>
     </div>
     <div class="statusbar" id="statusbar"></div>
   </div>
 
-  <aside>
-    <div class="tabs" role="tablist">
+  <aside class="rail right" aria-label="Images and color">
+    <div class="tabs" role="tablist" data-group="side" style="--n:2">
       <button type="button" role="tab" id="tab-images" aria-controls="p-images" data-tab="images">Images</button>
-      <button type="button" role="tab" id="tab-effect" aria-controls="p-effect" data-tab="effect">Effect</button>
-      <button type="button" role="tab" id="tab-motion" aria-controls="p-motion" data-tab="motion">Motion</button>
       <button type="button" role="tab" id="tab-color" aria-controls="p-color" data-tab="color">Color</button>
-      <button type="button" role="tab" id="tab-canvas" aria-controls="p-canvas" data-tab="canvas">Canvas</button>
-      <span class="tab-ind no-anim" id="tabInd" aria-hidden="true"></span>
+      <span class="tab-ind no-anim" aria-hidden="true"></span>
     </div>
-
-    <!-- IMAGES -->
     <div class="panel" role="tabpanel" id="p-images" aria-labelledby="tab-images">
+
       <section>
         <div class="row">
           <label class="btn primary" for="file">Add images</label>
@@ -330,97 +509,8 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
         <ul class="layers" id="layers"></ul>
       </section>
     </div>
-
-    <!-- EFFECT -->
-    <div class="panel" role="tabpanel" id="p-effect" aria-labelledby="tab-effect" hidden>
-      <section>
-        <div class="sec-title"><span>Overlap style</span></div>
-        <div class="seg" id="style" style="--cols:4">
-          <button type="button" data-v="dots"><span class="glyph">◎•</span>Dots</button>
-          <button type="button" data-v="ascii"><span class="glyph">#%:</span>ASCII</button>
-          <button type="button" data-v="waves"><span class="glyph">∿∿</span>Waves</button>
-          <button type="button" data-v="vectors"><span class="glyph">⟋⟍</span>Vectors</button>
-          <button type="button" data-v="truchet"><span class="glyph">◜◞</span>Truchet</button>
-          <button type="button" data-v="bars"><span class="glyph">▁▅█</span>Bars</button>
-          <button type="button" data-v="crosses"><span class="glyph">+ ✚</span>Crosses</button>
-          <button type="button" data-v="squares"><span class="glyph">▪■</span>Squares</button>
-          <button type="button" data-v="braille"><span class="glyph">⠿⠇</span>Braille</button>
-          <button type="button" data-v="blocks"><span class="glyph">░▒▓</span>Blocks</button>
-          <button type="button" data-v="dither"><span class="glyph">▚▞</span>Dither</button>
-          <button type="button" data-v="hex"><span class="glyph">⬡⬢</span>Hex</button>
-          <button type="button" data-v="led"><span class="glyph">●○</span>LED</button>
-          <button type="button" data-v="hatch"><span class="glyph">╱╳</span>Hatch</button>
-          <button type="button" data-v="rgb"><span class="glyph">∴</span>RGB drops</button>
-          <button type="button" data-v="rings"><span class="glyph">◎◉</span>Rings</button>
-        </div>
-        <label class="check"><input type="checkbox" id="depthVary">
-          <span>Change style with overlap depth<small>Two layers use the chosen style; three layers use the next one, and so on.</small></span>
-        </label>
-      </section>
-
-      <section>
-        <div class="sec-title"><span>How images combine</span></div>
-        <div class="seg" id="blend" style="--cols:3">
-          <button type="button" data-v="shape" title="Shape from the top image, color from the one below">Shape × Color</button>
-          <button type="button" data-v="top" title="The top image is converted">Top layer</button>
-          <button type="button" data-v="plus" title="Images add up (screen)">Plus</button>
-          <button type="button" data-v="minus" title="Top minus the one below">Minus</button>
-          <button type="button" data-v="diff" title="Only where the images differ">Difference</button>
-        </div>
-      </section>
-
-      <section>
-        <div class="sec-title"><span>Effect controls</span></div>
-        <div class="field"><label for="amount">Effect amount <span class="val" id="amountV"></span></label><input id="amount" type="range" min="0" max="100"></div>
-        <div class="field"><label for="cell">Cell size <span class="val" id="cellV"></span></label><input id="cell" type="range" min="4" max="120"></div>
-        <div class="field"><label for="threshold">Drop dark cells <span class="val" id="thresholdV"></span></label><input id="threshold" type="range" min="0" max="80"></div>
-        <div class="field"><label for="contrast">Contrast <span class="val" id="contrastV"></span></label><input id="contrast" type="range" min="50" max="300"></div>
-        <label class="check"><input type="checkbox" id="invert"><span>Invert brightness</span></label>
-      </section>
-
-      <section>
-        <div class="sec-title"><span>Finish</span><span>whole poster</span></div>
-        <div class="field"><label for="scanFx">Scan lines <span class="val" id="scanFxV"></span></label><input id="scanFx" type="range" min="0" max="100"></div>
-        <div class="field"><label for="rgbFx">RGB split <span class="val" id="rgbFxV"></span></label><input id="rgbFx" type="range" min="0" max="100"></div>
-        <div class="field"><label for="grainFx">Film grain <span class="val" id="grainFxV"></span></label><input id="grainFx" type="range" min="0" max="100"></div>
-        <div class="field"><label for="vigFx">Vignette <span class="val" id="vigFxV"></span></label><input id="vigFx" type="range" min="0" max="100"></div>
-      </section>
-    </div>
-
-    <!-- MOTION -->
-    <div class="panel" role="tabpanel" id="p-motion" aria-labelledby="tab-motion" hidden>
-      <section>
-        <div class="sec-title"><span>Overlap motion</span></div>
-        <div class="seg" id="motion" style="--cols:3">
-          <button type="button" data-v="off">Off</button>
-          <button type="button" data-v="breathe">Breathe</button>
-          <button type="button" data-v="wave">Wave</button>
-          <button type="button" data-v="scan">Scan</button>
-          <button type="button" data-v="drift">Drift</button>
-          <button type="button" data-v="glitch">Glitch</button>
-        </div>
-        <p class="note" id="motionNote"></p>
-        <div class="field"><label for="motionAmt">Motion strength <span class="val" id="motionAmtV"></span></label><input id="motionAmt" type="range" min="0" max="100"></div>
-        <div class="field"><label for="loop">Loop length <span class="val" id="loopV"></span></label><input id="loop" type="range" min="2" max="16"></div>
-      </section>
-
-      <section>
-        <div class="sec-title"><span>Image motion</span></div>
-        <div class="field"><label for="hop">Move images <span class="val" id="hopV"></span></label><input id="hop" type="range" min="0" max="4"></div>
-        <p class="note">Images hop across the grid, so the overlaps keep changing shape.</p>
-      </section>
-
-      <section>
-        <div class="row"><button class="btn" id="playBtn" type="button">Pause</button></div>
-        <div class="sec-title"><span>Record</span></div>
-        <p class="note">Records exactly one loop at full canvas size, so the clip repeats seamlessly.</p>
-        <div class="row"><button class="btn rec" id="recordBtn2" type="button">Record loop</button></div>
-        <div class="status" id="recStatus"></div>
-      </section>
-    </div>
-
-    <!-- COLOR -->
     <div class="panel" role="tabpanel" id="p-color" aria-labelledby="tab-color" hidden>
+
       <section>
         <div class="sec-title"><span>Mark colors</span></div>
         <div class="seg" id="colorMode" style="--cols:2">
@@ -447,7 +537,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
         </div>
 
         <div id="cm-source" class="field" hidden>
-          <p class="note">Each mark takes its color from the images underneath it. Use "Shape × Color" in the Effect tab for the most interesting mix.</p>
+          <p class="note">Each mark takes its color from the images underneath it. Use "Shape × Color" in the Effect panel for the most interesting mix.</p>
         </div>
 
         <div id="cm-single" class="field" hidden>
@@ -462,30 +552,6 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
         <div class="colorrow"><span class="swatch"><input type="color" id="backdrop" aria-label="Overlap backdrop color"></span><span class="lbl">Overlap backdrop</span><code id="backdropV"></code></div>
         <div class="colorrow"><span class="swatch"><input type="color" id="bg" aria-label="Canvas background color"></span><span class="lbl">Canvas background</span><code id="bgV"></code></div>
         <div class="colorrow"><span class="swatch"><input type="color" id="dotColor" aria-label="Background dot color"></span><span class="lbl">Background dots</span><code id="dotColorV"></code></div>
-      </section>
-    </div>
-
-    <!-- CANVAS -->
-    <div class="panel" role="tabpanel" id="p-canvas" aria-labelledby="tab-canvas" hidden>
-      <section>
-        <div class="sec-title"><span>Size</span></div>
-        <div class="row"><button class="btn" id="sizeBtn2" type="button">Change canvas size</button></div>
-      </section>
-
-      <section>
-        <div class="sec-title"><span>Grid</span></div>
-        <div class="field"><label for="grid">Grid size <span class="val" id="gridV"></span></label><input id="grid" type="range" min="10" max="240" step="5"></div>
-        <p class="note">Smaller cells give more dots on the background and finer snapping.</p>
-        <label class="check"><input type="checkbox" id="snap"><span>Snap images to grid</span></label>
-        <label class="check"><input type="checkbox" id="lines"><span>Show grid lines<small>Editing aid like Figma or Photoshop. Never exported.</small></span></label>
-        <div class="field indent"><label for="major">Major line every <span class="val" id="majorV"></span></label><input id="major" type="range" min="1" max="12"></div>
-      </section>
-
-      <section>
-        <div class="sec-title"><span>Poster details</span><span>exported</span></div>
-        <label class="check"><input type="checkbox" id="dots"><span>Background dots</span></label>
-        <div class="field indent"><label for="dotSize">Dot size <span class="val" id="dotSizeV"></span></label><input id="dotSize" type="range" min="1" max="10"></div>
-        <label class="check"><input type="checkbox" id="guides"><span>Labels and dashed guides</span></label>
       </section>
     </div>
   </aside>
@@ -1207,10 +1273,16 @@ function moveZ(id, dir) {
   [S.tiles[i], S.tiles[j]] = [S.tiles[j], S.tiles[i]];
   renderLayers(); requestRender();
 }
+function updateEmpty() {
+  const n = S.tiles.length;
+  document.getElementById('emptyState').hidden = n !== 0;
+  document.getElementById('oneMore').hidden = n !== 1;
+}
 function renderLayers() {
+  updateEmpty();
   document.getElementById('count').textContent = `${S.tiles.length} layer${S.tiles.length === 1 ? '' : 's'}`;
   layersEl.innerHTML = '';
-  if (!S.tiles.length) { layersEl.innerHTML = '<li class="empty">Add two or more images. Overlaps appear where they cross.</li>'; }
+  if (!S.tiles.length) { layersEl.innerHTML = '<li class="empty">No images yet. Add two or more, and the effect appears where they overlap.</li>'; }
   S.tiles.map((t, i) => [t, i]).reverse().forEach(([t, i]) => {
     const li = document.createElement('li');
     li.className = 'layer' + (S.sel === t.id ? ' sel' : '');
@@ -1262,7 +1334,12 @@ document.getElementById('delBtn').addEventListener('click', () => { const t = se
 
 function updateStatus() {
   const el = document.getElementById('statusbar'), t = selTile();
-  if (!t) { el.innerHTML = '<span><kbd>Click</kbd>select</span><span><kbd>Double-click</kbd>crop</span><span><kbd>Drop</kbd>add images</span>'; return; }
+  if (!t) {
+    el.innerHTML = S.tiles.length
+      ? '<span><kbd>Click</kbd>select</span><span><kbd>Double-click</kbd>crop</span><span><kbd>Drop</kbd>add images</span>'
+      : '<span><kbd>Drop</kbd>or <kbd>Paste</kbd>images to begin</span>';
+    return;
+  }
   const k = codeOf(t);
   if (S.crop === t.id) { el.innerHTML = `<span class="crop"><b>${k}</b> cropping</span><span><kbd>Drag</kbd>reposition</span><span><kbd>Scroll</kbd>zoom</span><span><kbd>Esc</kbd>done</span>`; return; }
   el.innerHTML = `<span><b>${k}</b> ${Math.round(t.w)} × ${Math.round(t.h)} at ${fmtCoord(t.x, t.y)}</span><span><kbd>Handles</kbd>resize</span><span><kbd>←↑↓→</kbd>nudge</span><span><kbd>Enter</kbd>crop</span><span><kbd>Del</kbd>remove</span>`;
@@ -1403,18 +1480,30 @@ document.getElementById('addStop').addEventListener('click', () => { if (S.stops
 document.getElementById('revStops').addEventListener('click', () => { S.stops.reverse(); renderStops(); buildLut(); requestRender(); });
 renderStops(); buildLut();
 
-// ---------- tabs ----------
+// ---------- tabs (one group per rail) ----------
 function showTab(name) {
-  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
-  document.querySelectorAll('.panel').forEach(p => p.hidden = p.id !== 'p-' + name);
-  const i = [...document.querySelectorAll('.tabs button')].findIndex(b => b.dataset.tab === name);
-  document.getElementById('tabInd').style.transform = `translateX(${Math.max(0, i) * 100}%)`;
-  try { localStorage.setItem('intersect-tab', name); } catch {}
+  const btn = document.querySelector(`.tabs button[data-tab="${name}"]`); if (!btn) return;
+  const bar = btn.closest('.tabs'), btns = [...bar.querySelectorAll('button')];
+  btns.forEach(b => { b.setAttribute('aria-selected', String(b === btn)); document.getElementById('p-' + b.dataset.tab).hidden = b !== btn; });
+  bar.querySelector('.tab-ind').style.transform = `translateX(${btns.indexOf(btn) * 100}%)`;
+  try { localStorage.setItem('intersect-tab-' + bar.dataset.group, name); } catch {}
 }
-document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
-let savedTab = 'images'; try { savedTab = localStorage.getItem('intersect-tab') || 'images'; } catch {}
-showTab(savedTab);
-requestAnimationFrame(() => document.getElementById('tabInd').classList.remove('no-anim'));
+document.querySelectorAll('.tabs').forEach(bar => {
+  bar.addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
+  let saved = null; try { saved = localStorage.getItem('intersect-tab-' + bar.dataset.group); } catch {}
+  showTab(bar.querySelector(`button[data-tab="${saved}"]`) ? saved : bar.querySelector('button').dataset.tab);
+});
+requestAnimationFrame(() => document.querySelectorAll('.tab-ind').forEach(i => i.classList.remove('no-anim')));
+
+// ---------- grid popover ----------
+const gridBtn = document.getElementById('gridBtn'), gridPop = document.getElementById('gridPop');
+function setGridPop(open, instant) {
+  gridBtn.setAttribute('aria-expanded', String(open));
+  open ? openModal(gridPop) : closeModal(gridPop, instant);
+}
+gridBtn.addEventListener('click', () => setGridPop(gridPop.hidden || gridPop.classList.contains('closing')));
+document.addEventListener('pointerdown', e => { if (!gridPop.hidden && !e.target.closest('.pop-wrap')) setGridPop(false); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !gridPop.hidden) { setGridPop(false, true); gridBtn.focus(); } });
 
 // ---------- canvas size ----------
 const sizeModal = document.getElementById('sizeModal'), cwEl = document.getElementById('cw'), chEl = document.getElementById('ch');
@@ -1457,7 +1546,6 @@ document.getElementById('applySize').addEventListener('click', applySize);
 document.getElementById('cancelSize').addEventListener('click', closeSize);
 sizeModal.addEventListener('click', e => { if (e.target === sizeModal) closeSize(); });
 document.getElementById('sizeBtn').addEventListener('click', openSize);
-document.getElementById('sizeBtn2').addEventListener('click', openSize);
 
 // ---------- export, download, copy, share ----------
 const modal = document.getElementById('modal');
@@ -1581,9 +1669,15 @@ function record() {
 document.getElementById('recordBtn').addEventListener('click', record);
 document.getElementById('recordBtn2').addEventListener('click', record);
 // ---------- boot ----------
-addTile(makeBranch(), 'Branch (sample)', 0, 180, 630, 630);
-addTile(makeBloom(), 'Bloom (sample)', 360, 360, 720, 630);
-addTile(makeDusk(), 'Dusk (sample)', 90, 720, 450, 540);
+function addSamples() {
+  const sx = S.W / 1080, sy = S.H / 1350, md = minDim();
+  const place = (img, name, x, y, w, h) => addTile(img, name, snapV(x * sx), snapV(y * sy), Math.max(md, snapV(w * sx)), Math.max(md, snapV(h * sy)));
+  place(makeBranch(), 'Branch (sample)', 0, 180, 630, 630);
+  place(makeBloom(), 'Bloom (sample)', 360, 360, 720, 630);
+  place(makeDusk(), 'Dusk (sample)', 90, 720, 450, 540);
+  S.sel = null; renderLayers(); requestRender();
+}
+document.getElementById('useSamples').addEventListener('click', addSamples);
 renderLayers();
 openSize();
 requestAnimationFrame(frame);

@@ -197,6 +197,8 @@ input[type=range]::-moz-range-thumb { width: 10px; height: 14px; background: var
 .btn[aria-pressed="true"] { background: var(--fg); color: var(--ink); border-color: var(--fg); }
 .btn.small { padding: 6px 10px; font-size: 12px; }
 .btn:disabled { opacity: 0.4; cursor: default; }
+.btn.vid::before { content: ""; width: 0; height: 0; border-left: 7px solid currentColor; border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent; }
+.btn.vid[aria-busy="true"] { opacity: 0.7; }
 .btn.rec::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 3px rgba(255,75,62,0.18); }
 .btn.rec[aria-busy="true"] { border-color: var(--signal); }
 .btn.rec[aria-busy="true"]::before { animation: blink 1s steps(2) infinite; }
@@ -359,7 +361,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
       </div>
     </div>
     <span class="spacer"></span>
-    <button class="btn rec" id="recordBtn" type="button">Record loop</button>
+    <button class="btn vid" id="recordBtn" type="button">Export MP4</button>
     <button class="btn primary" id="export" type="button">Export PNG</button>
   </header>
 
@@ -449,9 +451,12 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
 
       <section>
         <div class="row"><button class="btn" id="playBtn" type="button">Pause</button></div>
-        <div class="sec-title"><span>Record</span></div>
-        <p class="note">Records exactly one loop at full canvas size, so the clip repeats seamlessly.</p>
-        <div class="row"><button class="btn rec" id="recordBtn2" type="button">Record loop</button></div>
+        <div class="sec-title"><span>Export video</span></div>
+        <p class="note">Renders every frame of one loop at full canvas size and saves an MP4 that repeats seamlessly. Layer motion follows the same loop length.</p>
+        <div class="field"><span class="lbl">Frame rate</span>
+          <div class="seg" id="fps" style="--cols:2"><button type="button" data-v="30">30 fps</button><button type="button" data-v="60">60 fps</button></div>
+        </div>
+        <div class="row"><button class="btn primary vid" id="recordBtn2" type="button">Export MP4</button></div>
         <div class="status" id="recStatus"></div>
       </section>
     </div>
@@ -563,6 +568,27 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
           </div>
 
           <div class="field"><label for="rot">Rotation <span class="val" id="rotV"></span></label><input id="rot" type="range" min="-180" max="180"></div>
+          <div class="field"><span class="lbl">Layer motion</span>
+            <div class="seg" id="animSeg" style="--cols:4">
+              <button type="button" data-v="none">None</button>
+              <button type="button" data-v="slide">Slide</button>
+              <button type="button" data-v="pass">Pass</button>
+              <button type="button" data-v="orbit">Orbit</button>
+              <button type="button" data-v="bounce">Bounce</button>
+              <button type="button" data-v="sway">Sway</button>
+              <button type="button" data-v="spin">Spin</button>
+              <button type="button" data-v="pulse">Pulse</button>
+            </div>
+          </div>
+          <div class="props" id="animProps" hidden>
+            <p class="note" id="animNote"></p>
+            <div class="field" id="animAmtF"><label for="animAmt">Amount <span class="val" id="animAmtV"></span></label><input id="animAmt" type="range" min="0" max="100"></div>
+            <div class="field" id="animDirF"><label for="animDir">Direction <span class="val" id="animDirV"></span></label><input id="animDir" type="range" min="0" max="345" step="15"></div>
+            <div class="field"><label for="animPhase">Start offset <span class="val" id="animPhaseV"></span></label><input id="animPhase" type="range" min="0" max="100"></div>
+            <div class="field"><span class="lbl">Speed</span>
+              <div class="seg" id="animSpeed" style="--cols:3"><button type="button" data-v="1">1×</button><button type="button" data-v="2">2×</button><button type="button" data-v="3">3×</button></div>
+            </div>
+          </div>
           <div class="row">
             <button class="btn small" id="dupBtn" type="button">Duplicate</button>
             <button class="btn small" id="delBtn" type="button">Remove</button>
@@ -705,7 +731,7 @@ const S = {
   stops: ['#2a56cf', '#f59ad3', '#ffd59a'],
   backdrop: '#121013', bg: '#000000', dotColor: '#3a3a40',
   motion: 'breathe', motionAmt: 55, loop: 6, hop: 0, playing: true,
-  scanFx: 0, rgbFx: 0, grainFx: 0, vigFx: 0,
+  scanFx: 0, rgbFx: 0, grainFx: 0, vigFx: 0, fps: '30',
   tiles: [], sel: null, crop: null,
 };
 let nextId = 1;
@@ -761,15 +787,19 @@ function drawContent(g, t) {
   if (shaped) g.restore();
 }
 // rotation: layers turn around their centre
-function trig(t) { if (t._rot !== t.rot) { const a = (t.rot || 0) * Math.PI / 180; t._c = Math.cos(a); t._s = Math.sin(a); t._rot = t.rot; } }
-function toLocal(t, x, y) { trig(t); const dx = x - (t.rx + t.w / 2), dy = y - (t.ry + t.h / 2); return [dx * t._c + dy * t._s + t.w / 2, -dx * t._s + dy * t._c + t.h / 2]; }
-function toWorld(t, u, v) { trig(t); const lx = u - t.w / 2, ly = v - t.h / 2; return [t.rx + t.w / 2 + lx * t._c - ly * t._s, t.ry + t.h / 2 + lx * t._s + ly * t._c]; }
+// a layer is shown at (rx, ry) with rotation rr and scale rk; these include any motion, its own values (x, y, rot) don't
+function trig(t) { const r = t.rr ?? t.rot ?? 0, k = t.rk ?? 1; if (t._rot !== r || t._k !== k) { const a = r * Math.PI / 180; t._c = Math.cos(a); t._s = Math.sin(a); t._rot = r; t._k = k; } }
+function toLocal(t, x, y) { trig(t); const dx = x - (t.rx + t.w / 2), dy = y - (t.ry + t.h / 2); return [(dx * t._c + dy * t._s) / t._k + t.w / 2, (-dx * t._s + dy * t._c) / t._k + t.h / 2]; }
+function toWorld(t, u, v) { trig(t); const lx = (u - t.w / 2) * t._k, ly = (v - t.h / 2) * t._k; return [t.rx + t.w / 2 + lx * t._c - ly * t._s, t.ry + t.h / 2 + lx * t._s + ly * t._c]; }
 function aabb(t) {
   const pts = [[0, 0], [t.w, 0], [t.w, t.h], [0, t.h]].map(([u, v]) => toWorld(t, u, v));
   const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
   return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
 }
-function withTile(g, t, fn) { g.save(); g.translate(t.rx + t.w / 2, t.ry + t.h / 2); if (t.rot) g.rotate(t.rot * Math.PI / 180); g.translate(-t.w / 2, -t.h / 2); fn(); g.restore(); }
+function withTile(g, t, fn) {
+  const r = t.rr ?? t.rot ?? 0, k = t.rk ?? 1;
+  g.save(); g.translate(t.rx + t.w / 2, t.ry + t.h / 2); if (r) g.rotate(r * Math.PI / 180); if (k !== 1) g.scale(k, k); g.translate(-t.w / 2, -t.h / 2); fn(); g.restore();
+}
 function drawTile(g, t) { withTile(g, t, () => drawContent(g, t)); }
 
 // ---------- sample images (generated, so the tool opens in a working state) ----------
@@ -855,7 +885,7 @@ let noisePat = null;
 
 // ---------- layers ----------
 function addTile(img, name, x, y, w, h) {
-  const t = { id: nextId++, kind: 'image', img, name, x, y, w, h, rx: x, ry: y, rot: 0, fit: 'cover', shape: 'rect', zoom: 1, fx: 0, fy: 0, ver: 0, cache: null };
+  const t = { id: nextId++, kind: 'image', img, name, x, y, w, h, rx: x, ry: y, rot: 0, fit: 'cover', shape: 'rect', zoom: 1, fx: 0, fy: 0, ver: 0, cache: null, anim: newAnim() };
   S.tiles.push(t); return t;
 }
 const selTile = () => S.tiles.find(t => t.id === S.sel) || null;
@@ -1003,13 +1033,37 @@ function cellV(L, x, y) {
   return r;
 }
 const valueAt = (L, x, y) => cellV(L, x, y).v;
+const hasLayerMotion = () => S.tiles.some(t => t.anim && t.anim.type !== 'none');
+// returns [dx, dy, extra rotation in degrees, scale]
+function layerMotion(t) {
+  const a = t.anim; if (!a || a.type === 'none') return [0, 0, 0, 1];
+  const ph = P * a.speed + a.phase / 100 * TAU, amt = a.amt / 100, d = a.dir * Math.PI / 180, ux = Math.cos(d), uy = Math.sin(d);
+  const reach = Math.min(S.W, S.H) * 0.5 * amt;
+  switch (a.type) {
+    case 'slide': { const o = Math.sin(ph) * reach; return [ux * o, uy * o, 0, 1]; }
+    case 'orbit': return [Math.cos(ph) * reach * 0.6, Math.sin(ph) * reach * 0.6, 0, 1];
+    case 'bounce': { const o = Math.abs(Math.sin(ph)) * reach * 0.7; return [ux * o, uy * o, 0, 1]; }
+    case 'pass': {
+      // crosses the whole canvas once per loop and is fully off-canvas at the loop point, so the jump back is never seen
+      const D = Math.hypot(S.W, S.H) / 2 + Math.hypot(t.w, t.h) / 2, k = ((ph / TAU) % 1 + 1) % 1, o = (k * 2 - 1) * D;
+      return [ux * o, uy * o, 0, 1];
+    }
+    case 'sway': return [0, 0, Math.sin(ph) * 50 * amt, 1];
+    case 'spin': return [0, 0, (ph * 180 / Math.PI) % 360, 1];
+    case 'pulse': return [0, 0, 0, 1 + Math.sin(ph) * 0.4 * amt];
+  }
+  return [0, 0, 0, 1];
+}
 function place() {
   const on = S.hop > 0;
   S.tiles.forEach((t, i) => {
-    if (!on) { t.rx = t.x; t.ry = t.y; return; }
-    let ox = Math.sin(P + i * 2.1) * S.hop * S.grid, oy = Math.sin(P * (i % 2 ? 1 : 2) + i * 1.3) * S.hop * S.grid;
-    if (S.snap) { ox = Math.round(ox / S.grid) * S.grid; oy = Math.round(oy / S.grid) * S.grid; }
-    t.rx = t.x + ox; t.ry = t.y + oy;
+    let ox = 0, oy = 0;
+    if (on) {
+      ox = Math.sin(P + i * 2.1) * S.hop * S.grid; oy = Math.sin(P * (i % 2 ? 1 : 2) + i * 1.3) * S.hop * S.grid;
+      if (S.snap) { ox = Math.round(ox / S.grid) * S.grid; oy = Math.round(oy / S.grid) * S.grid; }
+    }
+    const [mx, my, mr, mk] = layerMotion(t);
+    t.rx = t.x + ox + mx; t.ry = t.y + oy + my; t.rr = (t.rot || 0) + mr; t.rk = mk;
   });
 }
 function drawMark(style, cx, cy, s, v, col, gx, gy, L) {
@@ -1140,9 +1194,11 @@ function drawMark(style, cx, cy, s, v, col, gx, gy, L) {
 
 // ---------- render ----------
 let dirty = true, recording = false, clockMs = 0, lastT = performance.now();
-const animating = () => recording || (S.playing && (S.motion !== 'off' || S.hop > 0));
+let exporting = false;
+const animating = () => recording || (S.playing && (S.motion !== 'off' || S.hop > 0 || hasLayerMotion()));
 function requestRender() { dirty = true; }
 function frame(now) {
+  if (exporting) { lastT = now; requestAnimationFrame(frame); return; }   // the exporter drives the clock
   if (S.playing || recording) clockMs += now - lastT;
   lastT = now;
   P = ((clockMs / 1000) % S.loop) / S.loop * TAU;
@@ -1528,6 +1584,7 @@ function syncSel() {
     ? 'Double-click the text on the canvas to edit it. Drag a corner to scale, or the round handle to rotate (Shift snaps to 15°).'
     : 'Double-click an image to crop it on the canvas. Drag the round handle to rotate (Shift snaps to 15°).';
   rotEl.value = Math.round(t.rot || 0); document.getElementById('rotV').textContent = `${Math.round(t.rot || 0)}°`;
+  syncAnim(t);
   if (isText) {
     if (document.activeElement !== txt('txtContent')) txt('txtContent').value = t.text;
     txt('txtFont').value = t.font;
@@ -1558,6 +1615,30 @@ function syncSel() {
   paintRange(rotEl);
 }
 rotEl.addEventListener('input', () => { const t = selTile(); if (t) { t.rot = +rotEl.value; syncSel(); requestRender(); } });
+function newAnim() { return { type: 'none', amt: 50, dir: 0, phase: 0, speed: 1 }; }
+const ANIM_NOTES = {
+  slide: 'Glides back and forth along a direction.',
+  pass: 'Crosses the whole canvas once per loop, entering and leaving off-canvas.',
+  orbit: 'Circles around its place.',
+  bounce: 'Hops away and back along a direction.',
+  sway: 'Rocks from side to side around its centre.',
+  spin: 'Turns a full circle every loop.',
+  pulse: 'Grows and shrinks, so its overlaps breathe.',
+};
+function syncAnim(t) {
+  const a = t.anim || (t.anim = newAnim());
+  document.querySelectorAll('#animSeg button').forEach(b => b.setAttribute('aria-pressed', String(a.type === b.dataset.v)));
+  document.getElementById('animProps').hidden = a.type === 'none';
+  document.getElementById('animNote').textContent = ANIM_NOTES[a.type] || '';
+  document.getElementById('animAmtF').hidden = a.type === 'pass' || a.type === 'spin';
+  document.getElementById('animDirF').hidden = !['slide', 'pass', 'bounce'].includes(a.type);
+  [['animAmt', a.amt, `${a.amt}%`], ['animDir', a.dir, `${a.dir}°`], ['animPhase', a.phase, `${a.phase}%`]].forEach(([id, v, label]) => { const el = document.getElementById(id); el.value = v; document.getElementById(id + 'V').textContent = label; paintRange(el); });
+  document.querySelectorAll('#animSpeed button').forEach(b => b.setAttribute('aria-pressed', String(a.speed === +b.dataset.v)));
+}
+const onAnim = fn => { const t = selTile(); if (!t) return; fn(t.anim || (t.anim = newAnim())); syncAnim(t); requestRender(); };
+document.getElementById('animSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) onAnim(a => { a.type = b.dataset.v; if (a.type === 'pass' && a.dir === 0) a.dir = 0; }); });
+document.getElementById('animSpeed').addEventListener('click', e => { const b = e.target.closest('button'); if (b) onAnim(a => { a.speed = +b.dataset.v; }); });
+['animAmt', 'animDir', 'animPhase'].forEach(id => document.getElementById(id).addEventListener('input', e => onAnim(a => { a[{ animAmt: 'amt', animDir: 'dir', animPhase: 'phase' }[id]] = +e.target.value; })));
 document.getElementById('shapeSeg').addEventListener('click', e => {
   const b = e.target.closest('button'), t = selTile(); if (!b || !t || t.kind === 'text') return;
   t.shape = b.dataset.v; syncSel(); requestRender();
@@ -1678,7 +1759,7 @@ function renderText(t) {
 }
 function addText() {
   const t = { id: nextId++, kind: 'text', img: null, name: 'Text', x: S.W / 2, y: S.H / 2, w: 0, h: 0, rx: 0, ry: 0, rot: 0, fit: 'cover', zoom: 1, fx: 0, fy: 0, ver: 0, cache: null,
-    text: 'OVERLAP', font: 'Archivo', weight: 900, italic: false, size: Math.round(Math.min(S.W, S.H) * 0.2), track: -2, lead: 90, align: 'center', color: '#f3f1f4', cut: true };
+    text: 'OVERLAP', font: 'Archivo', weight: 900, italic: false, size: Math.round(Math.min(S.W, S.H) * 0.2), track: -2, lead: 90, align: 'center', color: '#f3f1f4', cut: true, anim: newAnim() };
   layoutText(t); t.x = (S.W - t.w) / 2; t.y = (S.H - t.h) / 2; t.rx = t.x; t.ry = t.y;
   S.tiles.push(t); renderText(t);
   showTab('images'); select(t.id); editText();
@@ -1716,7 +1797,7 @@ document.getElementById('fitBtn').addEventListener('click', () => {
 });
 document.getElementById('dupBtn').addEventListener('click', () => {
   const t = selTile(); if (!t) return;
-  const c = { ...t, id: nextId++, cache: null, _rot: undefined, name: t.name + ' copy', x: t.x + S.grid, y: t.y + S.grid };
+  const c = { ...t, id: nextId++, cache: null, _rot: undefined, anim: { ...t.anim }, name: t.name + ' copy', x: t.x + S.grid, y: t.y + S.grid };
   c.rx = c.x; c.ry = c.y; S.tiles.push(c);
   select(c.id);
 });
@@ -1826,11 +1907,13 @@ const MOTION_NOTES = {
 const showMotionNote = () => { document.getElementById('motionNote').textContent = MOTION_NOTES[S.motion]; };
 seg('motion', 'motion', showMotionNote); showMotionNote();
 slider('motionAmt', 'motionAmt', v => v + '%');
-slider('loop', 'loop', v => v + ' s', () => { document.querySelectorAll('.rec').forEach(b => { if (!recording) b.textContent = `Record loop (${S.loop} s)`; }); });
+slider('loop', 'loop', v => v + ' s', () => { if (!recording && !exporting) setVidLabels(); });
 slider('hop', 'hop', v => v ? `${v} cell${v > 1 ? 's' : ''}` : 'off');
 const playBtn = document.getElementById('playBtn');
 playBtn.addEventListener('click', () => { S.playing = !S.playing; playBtn.textContent = S.playing ? 'Pause' : 'Play'; requestRender(); });
-document.querySelectorAll('.rec').forEach(b => b.textContent = `Record loop (${S.loop} s)`);
+function setVidLabels(text) { document.querySelectorAll('.vid').forEach(b => { b.textContent = text || `Export MP4 · ${S.loop} s`; b.toggleAttribute('aria-busy', !!text); }); }
+setVidLabels();
+seg('fps', 'fps');
 
 // ---------- color ----------
 function colorInput(id, key, onChange) {
@@ -2043,7 +2126,45 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hid
 
 const recStatus = document.getElementById('recStatus');
 function recMsg(t) { recStatus.textContent = t; }
-function record() {
+// Frame-accurate export: render every frame of one loop, encode with WebCodecs, write an MP4.
+async function exportVideo() {
+  if (recording || exporting) return;
+  if (!('VideoEncoder' in window)) return liveRecord();
+  const fps = +S.fps, n = Math.max(1, Math.round(S.loop * fps)), W2 = S.W & ~1, H2 = S.H & ~1;
+  const bitrate = Math.min(40e6, Math.round(W2 * H2 * fps * 0.2));
+  let codec = null;
+  for (const c of ['avc1.640034', 'avc1.640033', 'avc1.64002A', 'avc1.4D0034', 'avc1.42003E']) {
+    try { if ((await VideoEncoder.isConfigSupported({ codec: c, width: W2, height: H2, bitrate, framerate: fps })).supported) { codec = c; break; } } catch {}
+  }
+  if (!codec) return liveRecord();
+  exporting = true; S.crop = null; renderLayers(); setVidLabels('Exporting 0%');
+  const keep = { clockMs };
+  let failure = null;
+  try {
+    const { Muxer, ArrayBufferTarget } = await import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.mjs');
+    const muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: 'avc', width: W2, height: H2, frameRate: fps }, fastStart: 'in-memory' });
+    const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: e => { failure = e; } });
+    enc.configure({ codec, width: W2, height: H2, bitrate, framerate: fps, avc: { format: 'avc' } });
+    const even = (W2 !== S.W || H2 !== S.H) ? mk(W2, H2) : null;
+    for (let i = 0; i < n && !failure; i++) {
+      P = i / n * TAU; render(false);
+      let src = cv; if (even) { even.getContext('2d').drawImage(cv, 0, 0); src = even; }
+      const vf = new VideoFrame(src, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
+      enc.encode(vf, { keyFrame: i % (fps * 2) === 0 }); vf.close();
+      while (enc.encodeQueueSize > 4) await new Promise(r => setTimeout(r, 1));
+      if (i % 6 === 0) { setVidLabels(`Exporting ${Math.round(i / n * 100)}%`); await new Promise(r => setTimeout(r, 0)); }
+    }
+    if (failure) throw failure;
+    await enc.flush(); enc.close(); muxer.finalize();
+    showOutput('video', new Blob([muxer.target.buffer], { type: 'video/mp4' }), `intersect-${S.W}x${S.H}-loop.mp4`);
+  } catch (err) {
+    console.error(err); say(`Video export failed: ${err && err.message || err}`, { error: true });
+  } finally {
+    exporting = false; clockMs = keep.clockMs; setVidLabels(); requestRender();
+  }
+}
+// Fallback for browsers without WebCodecs: record the live canvas for one loop.
+function liveRecord() {
   if (recording) return;
   const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
   const mime = window.MediaRecorder && types.find(t => MediaRecorder.isTypeSupported(t));
@@ -2055,7 +2176,7 @@ function record() {
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   rec.onstop = () => {
     recording = false;
-    document.querySelectorAll('.rec').forEach(b => { b.removeAttribute('aria-busy'); b.textContent = `Record loop (${S.loop} s)`; });
+    setVidLabels();
     recMsg('');
     if (!chunks.length) { recMsg('Nothing was recorded. Try again.'); return; }
     const type = mime.split(';')[0], ext = /mp4/.test(type) ? 'mp4' : 'webm';
@@ -2063,13 +2184,13 @@ function record() {
   };
   S.crop = null; renderLayers();
   clockMs = 0; recording = true;
-  document.querySelectorAll('.rec').forEach(b => { b.setAttribute('aria-busy', 'true'); b.textContent = 'Recording…'; });
+  setVidLabels('Recording…');
   recMsg(`Recording one ${S.loop}-second loop…`);
   rec.start(250);
   setTimeout(() => rec.stop(), S.loop * 1000 + 60);
 }
-document.getElementById('recordBtn').addEventListener('click', record);
-document.getElementById('recordBtn2').addEventListener('click', record);
+document.getElementById('recordBtn').addEventListener('click', exportVideo);
+document.getElementById('recordBtn2').addEventListener('click', exportVideo);
 // ---------- boot ----------
 function addSamples() {
   const sx = S.W / 1080, sy = S.H / 1350, md = minDim();

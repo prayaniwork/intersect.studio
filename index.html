@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Martian+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=Geist:wght@400;500;600;700;900&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Martian+Mono:wght@400;500;600;700&family=Unbounded:wght@400;700;900&display=swap">
 <style>
 /* Layout: one-screen studio. Monochrome chrome so the poster carries all the color; selected states invert to white.
    Top bar, poster stage with print crop marks on the left, tabbed control rail on the right; stacks on phones. Single dark theme by choice. */
@@ -208,6 +208,15 @@ input[type=range]::-moz-range-thumb { width: 10px; height: 14px; background: var
 .selcard .head { display: flex; gap: 10px; align-items: center; min-width: 0; }
 .selcard .head b { font-family: var(--font-label); font-size: 10px; font-weight: 500; background: var(--fg); color: var(--ink); padding: 2px 6px; border-radius: var(--r); }
 .selcard .head span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.props { display: flex; flex-direction: column; gap: 12px; }
+.selcard textarea, .selcard select {
+  width: 100%; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r); color: var(--fg);
+  padding: 8px 10px; font: 13px/1.4 var(--font-ui); transition: border-color 150ms ease;
+}
+.selcard textarea { resize: vertical; min-height: 64px; }
+.selcard select { appearance: none; -webkit-appearance: none; cursor: pointer; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 28px; }
+.selcard textarea:focus, .selcard select:focus { outline: none; border-color: var(--fg); }
+.seg button:disabled { opacity: 0.35; cursor: default; }
 
 .layers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 .layer { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 2px; border-bottom: 1px solid var(--line); cursor: pointer; transition: background-color 150ms ease; }
@@ -459,7 +468,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
           <p class="es-sub">or drop or paste them here · <button type="button" class="link" id="useSamples">try sample images</button></p>
         </div>
         <div class="one-more" id="oneMore" hidden>
-          <span>Add one more image. The effect only happens where they overlap.</span>
+          <span>Add one more image or some text. The effect only happens where they overlap.</span>
           <label class="btn small primary" for="file">Add image</label>
         </div>
       </div>
@@ -469,7 +478,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
 
   <aside class="rail right" aria-label="Images and color">
     <div class="tabs" role="tablist" data-group="side" style="--n:2">
-      <button type="button" role="tab" id="tab-images" aria-controls="p-images" data-tab="images">Images</button>
+      <button type="button" role="tab" id="tab-images" aria-controls="p-images" data-tab="images">Layers</button>
       <button type="button" role="tab" id="tab-color" aria-controls="p-color" data-tab="color">Color</button>
       <span class="tab-ind no-anim" aria-hidden="true"></span>
     </div>
@@ -479,28 +488,67 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
         <div class="row">
           <label class="btn primary" for="file">Add images</label>
           <input id="file" type="file" accept="image/*" multiple hidden>
-          <button class="btn" id="shuffle" type="button">Shuffle layout</button>
+          <button class="btn" id="addText" type="button">Add text</button>
         </div>
-        <p class="note">You can also drop or paste images onto the canvas.</p>
+        <div class="row"><button class="btn small" id="shuffle" type="button">Shuffle layout</button></div>
+        <p class="note">Drop or paste images onto the canvas. Text cuts through images: where letters cross an image, they become the effect.</p>
       </section>
 
       <section id="selSection" hidden>
-        <div class="sec-title"><span>Selected image</span></div>
+        <div class="sec-title"><span id="selTitle">Selected image</span></div>
         <div class="selcard">
           <div class="head"><b id="selCode">C1</b><span id="selName"></span></div>
-          <div class="row">
-            <button class="btn small" id="cropBtn" type="button" aria-pressed="false">Crop</button>
-            <button class="btn small" id="fitBtn" type="button" title="Resize the frame to the image's own proportions">Fit frame to image</button>
+
+          <div class="props" id="imgProps">
+            <div class="row">
+              <button class="btn small" id="cropBtn" type="button" aria-pressed="false">Crop</button>
+              <button class="btn small" id="fitBtn" type="button" title="Resize the frame to the image's own proportions">Fit frame to image</button>
+            </div>
+            <div class="field"><label for="zoom">Zoom inside frame <span class="val" id="zoomV"></span></label><input id="zoom" type="range" min="100" max="500"></div>
+            <div class="field"><label for="panX">Horizontal position <span class="val" id="panXV"></span></label><input id="panX" type="range" min="-100" max="100"></div>
+            <div class="field"><label for="panY">Vertical position <span class="val" id="panYV"></span></label><input id="panY" type="range" min="-100" max="100"></div>
+            <div class="row"><button class="btn small" id="resetCrop" type="button">Reset crop</button></div>
           </div>
-          <div class="field"><label for="zoom">Zoom inside frame <span class="val" id="zoomV"></span></label><input id="zoom" type="range" min="100" max="500"></div>
-          <div class="field"><label for="panX">Horizontal position <span class="val" id="panXV"></span></label><input id="panX" type="range" min="-100" max="100"></div>
-          <div class="field"><label for="panY">Vertical position <span class="val" id="panYV"></span></label><input id="panY" type="range" min="-100" max="100"></div>
+
+          <div class="props" id="textProps" hidden>
+            <div class="field"><label for="txtContent">Text</label><textarea id="txtContent" rows="3" spellcheck="false"></textarea></div>
+            <div class="field"><label for="txtFont">Typeface</label>
+              <select id="txtFont">
+                <option value="Archivo">Archivo · grotesk</option>
+                <option value="Instrument Serif">Instrument Serif · serif</option>
+                <option value="Unbounded">Unbounded · wide display</option>
+                <option value="Geist">Geist · sans</option>
+                <option value="Martian Mono">Martian Mono · mono</option>
+              </select>
+            </div>
+            <div class="field"><span class="lbl">Weight</span>
+              <div class="seg" id="txtWeight" style="--cols:4">
+                <button type="button" data-v="400">Regular</button>
+                <button type="button" data-v="700">Bold</button>
+                <button type="button" data-v="900">Black</button>
+                <button type="button" data-v="italic" id="txtItalic" aria-pressed="false"><em>Italic</em></button>
+              </div>
+            </div>
+            <div class="field"><label for="txtSize">Size <span class="val" id="txtSizeV"></span></label><input id="txtSize" type="range" min="16" max="800"></div>
+            <div class="field"><label for="txtTrack">Letter spacing <span class="val" id="txtTrackV"></span></label><input id="txtTrack" type="range" min="-12" max="40"></div>
+            <div class="field"><label for="txtLead">Line height <span class="val" id="txtLeadV"></span></label><input id="txtLead" type="range" min="70" max="160"></div>
+            <div class="field"><span class="lbl">Align</span>
+              <div class="seg" id="txtAlign" style="--cols:3">
+                <button type="button" data-v="left">Left</button>
+                <button type="button" data-v="center">Center</button>
+                <button type="button" data-v="right">Right</button>
+              </div>
+            </div>
+            <div class="colorrow"><span class="swatch"><input type="color" id="txtColor" aria-label="Text color"></span><span class="lbl">Text color</span><code id="txtColorV"></code></div>
+            <label class="check"><input type="checkbox" id="txtCut"><span>Cuts through images<small>Where the letters cross an image, they turn into the effect. Turn off for normal type that sits on top.</small></span></label>
+          </div>
+
+          <div class="field"><label for="rot">Rotation <span class="val" id="rotV"></span></label><input id="rot" type="range" min="-180" max="180"></div>
           <div class="row">
-            <button class="btn small" id="resetCrop" type="button">Reset crop</button>
             <button class="btn small" id="dupBtn" type="button">Duplicate</button>
             <button class="btn small" id="delBtn" type="button">Remove</button>
           </div>
-          <p class="note">Double-click an image to crop it on the canvas: drag to reposition, scroll to zoom, Esc when done.</p>
+          <p class="note" id="selNote"></p>
         </div>
       </section>
 
@@ -663,14 +711,29 @@ function drawCoverPlain(g, img, x, y, w, h) {
   const s = Math.max(w / iw(img), h / ih(img)), sw = w / s, sh = h / s;
   g.drawImage(img, (iw(img) - sw) / 2, (ih(img) - sh) / 2, sw, sh, x, y, w, h);
 }
-// crop geometry: frame (w,h) covered by the image, then zoomed and panned (fx, fy in -1..1)
+// Crop geometry inside a layer's own frame (0..w, 0..h): the image covers (or fits inside) the frame,
+// then zooms and pans (fx, fy in -1..1). Text layers are drawn 1:1.
 function geom(t) {
   const IW = iw(t.img), IH = ih(t.img);
-  const s = Math.max(t.w / IW, t.h / IH) * t.zoom, sw = t.w / s, sh = t.h / s;
+  if (t.kind === 'text') return { IW, IH, s: 1, sw: IW, sh: IH, sx: 0, sy: 0, dx: 0, dy: 0, dw: t.w, dh: t.h };
+  const s = (t.fit === 'contain' ? Math.min(t.w / IW, t.h / IH) : Math.max(t.w / IW, t.h / IH)) * t.zoom;
+  const sw = Math.min(IW, t.w / s), sh = Math.min(IH, t.h / s);
   const sx = (IW - sw) * (0.5 + t.fx * 0.5), sy = (IH - sh) * (0.5 + t.fy * 0.5);
-  return { IW, IH, s, sw, sh, sx, sy };
+  const dw = sw * s, dh = sh * s;
+  return { IW, IH, s, sw, sh, sx, sy, dx: (t.w - dw) / 2, dy: (t.h - dh) / 2, dw, dh };
 }
-function drawTile(g, t) { const k = geom(t); g.drawImage(t.img, k.sx, k.sy, k.sw, k.sh, t.rx, t.ry, t.w, t.h); }
+function drawContent(g, t) { const k = geom(t); g.drawImage(t.img, k.sx, k.sy, k.sw, k.sh, k.dx, k.dy, k.dw, k.dh); }
+// rotation: layers turn around their centre
+function trig(t) { if (t._rot !== t.rot) { const a = (t.rot || 0) * Math.PI / 180; t._c = Math.cos(a); t._s = Math.sin(a); t._rot = t.rot; } }
+function toLocal(t, x, y) { trig(t); const dx = x - (t.rx + t.w / 2), dy = y - (t.ry + t.h / 2); return [dx * t._c + dy * t._s + t.w / 2, -dx * t._s + dy * t._c + t.h / 2]; }
+function toWorld(t, u, v) { trig(t); const lx = u - t.w / 2, ly = v - t.h / 2; return [t.rx + t.w / 2 + lx * t._c - ly * t._s, t.ry + t.h / 2 + lx * t._s + ly * t._c]; }
+function aabb(t) {
+  const pts = [[0, 0], [t.w, 0], [t.w, t.h], [0, t.h]].map(([u, v]) => toWorld(t, u, v));
+  const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
+  return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+}
+function withTile(g, t, fn) { g.save(); g.translate(t.rx + t.w / 2, t.ry + t.h / 2); if (t.rot) g.rotate(t.rot * Math.PI / 180); g.translate(-t.w / 2, -t.h / 2); fn(); g.restore(); }
+function drawTile(g, t) { withTile(g, t, () => drawContent(g, t)); }
 
 // ---------- sample images (generated, so the tool opens in a working state) ----------
 function makeBloom() {
@@ -753,50 +816,89 @@ const noise = mk(128, 128);
 (() => { const g = noise.getContext('2d'), d = g.createImageData(128, 128), R = rng(99); for (let i = 0; i < d.data.length; i += 4) { const v = R() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; } g.putImageData(d, 0, 0); })();
 let noisePat = null;
 
-// ---------- tiles ----------
+// ---------- layers ----------
 function addTile(img, name, x, y, w, h) {
-  const t = { id: nextId++, img, name, x, y, w, h, rx: x, ry: y, zoom: 1, fx: 0, fy: 0, cache: null };
+  const t = { id: nextId++, kind: 'image', img, name, x, y, w, h, rx: x, ry: y, rot: 0, fit: 'cover', zoom: 1, fx: 0, fy: 0, ver: 0, cache: null };
   S.tiles.push(t); return t;
 }
 const selTile = () => S.tiles.find(t => t.id === S.sel) || null;
-const codeOf = t => 'C' + (S.tiles.indexOf(t) + 1);
+const codeOf = t => (t.kind === 'text' ? 'T' : 'C') + (S.tiles.filter(q => q.kind === t.kind).indexOf(t) + 1);
+// a small copy of each layer in its own frame; its alpha says where the layer really has pixels
 function getCache(t) {
   const cw = Math.max(1, Math.ceil(t.w / DS)), ch = Math.max(1, Math.ceil(t.h / DS));
-  const key = `${cw}|${ch}|${t.zoom}|${t.fx}|${t.fy}`;
+  const key = `${cw}|${ch}|${t.zoom}|${t.fx}|${t.fy}|${t.fit}|${t.ver}`;
   if (t.cache && t.cache.key === key) return t.cache;
   const c = mk(cw, ch), g = c.getContext('2d', { willReadFrequently: true });
-  g.imageSmoothingQuality = 'high';
-  const k = geom(t);
-  g.drawImage(t.img, k.sx, k.sy, k.sw, k.sh, 0, 0, cw, ch);
+  g.imageSmoothingQuality = 'high'; g.scale(cw / t.w, ch / t.h); drawContent(g, t);
   t.cache = { key, cw, ch, data: g.getImageData(0, 0, cw, ch).data };
   return t.cache;
 }
+function cacheAt(t, u, v) { const c = getCache(t); return (clamp((v * c.ch / t.h) | 0, 0, c.ch - 1) * c.cw + clamp((u * c.cw / t.w) | 0, 0, c.cw - 1)) * 4; }
 function sample(t, x, y) {
-  const c = getCache(t);
-  const u = clamp(((x - t.rx) / DS) | 0, 0, c.cw - 1), v = clamp(((y - t.ry) / DS) | 0, 0, c.ch - 1);
-  const i = (v * c.cw + u) * 4;
-  return [c.data[i] / 255, c.data[i + 1] / 255, c.data[i + 2] / 255];
+  const [u, v] = toLocal(t, x, y), d = getCache(t).data, i = cacheAt(t, u, v);
+  return [d[i] / 255, d[i + 1] / 255, d[i + 2] / 255];
 }
+// true only where the layer has visible pixels (so transparency, rotation and letterforms all count)
+function covers(t, x, y) {
+  const [u, v] = toLocal(t, x, y);
+  if (u < 0 || v < 0 || u >= t.w || v >= t.h) return false;
+  return getCache(t).data[cacheAt(t, u, v) + 3] > 127;
+}
+const cuts = t => t.kind !== 'text' || t.cut;   // layers that take part in overlaps
 function covering(x, y) {
   const out = [];
-  for (let i = S.tiles.length - 1; i >= 0; i--) { const t = S.tiles[i]; if (x >= t.rx && x < t.rx + t.w && y >= t.ry && y < t.ry + t.h) out.push(t); }
+  for (let i = S.tiles.length - 1; i >= 0; i--) { const t = S.tiles[i]; if (cuts(t) && covers(t, x, y)) out.push(t); }
   return out;
 }
-function overlapRects() {
-  const rs = [];
-  for (let i = 0; i < S.tiles.length; i++) for (let j = i + 1; j < S.tiles.length; j++) {
-    const a = S.tiles[i], b = S.tiles[j];
-    const x0 = Math.max(a.rx, b.rx), y0 = Math.max(a.ry, b.ry), x1 = Math.min(a.rx + a.w, b.rx + b.w), y1 = Math.min(a.ry + a.h, b.ry + b.h);
-    if (x1 > x0 && y1 > y0) rs.push({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+// Where do layers really overlap? Scan the candidate area at `step` px and build:
+// a backdrop mask for the overlap shape, the area to draw marks in, and one labelled region per overlapping pair.
+let maskCanvas = null;
+function computeOverlaps(step) {
+  const T = S.tiles.filter(cuts), B = T.map(aabb), pairs = [];
+  for (let i = 0; i < T.length; i++) for (let j = i + 1; j < T.length; j++) {
+    const x0 = Math.max(B[i].x0, B[j].x0, 0), y0 = Math.max(B[i].y0, B[j].y0, 0), x1 = Math.min(B[i].x1, B[j].x1, S.W), y1 = Math.min(B[i].y1, B[j].y1, S.H);
+    if (x1 > x0 && y1 > y0) pairs.push({ i, j, x0, y0, x1, y1, b: [Infinity, Infinity, -Infinity, -Infinity] });
   }
-  return rs;
+  if (!pairs.length) return { regions: [], area: null };
+  const U = pairs.reduce((u, q) => ({ x0: Math.min(u.x0, q.x0), y0: Math.min(u.y0, q.y0), x1: Math.max(u.x1, q.x1), y1: Math.max(u.y1, q.y1) }), { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity });
+  const mw = Math.max(1, Math.ceil((U.x1 - U.x0) / step)), mh = Math.max(1, Math.ceil((U.y1 - U.y0) / step));
+  const img = new ImageData(mw, mh), d = img.data, pairOf = new Map(pairs.map((q, k) => [q.i * 64 + q.j, q]));
+  let any = false;
+  for (let my = 0; my < mh; my++) {
+    const y = U.y0 + (my + 0.5) * step;
+    for (let mx = 0; mx < mw; mx++) {
+      const x = U.x0 + (mx + 0.5) * step, cov = [];
+      for (let k = 0; k < T.length; k++) if (x >= B[k].x0 && x <= B[k].x1 && y >= B[k].y0 && y <= B[k].y1 && covers(T[k], x, y)) cov.push(k);
+      if (cov.length < 2) continue;
+      any = true; d[(my * mw + mx) * 4 + 3] = 255;
+      for (let a = 0; a < cov.length; a++) for (let b = a + 1; b < cov.length; b++) {
+        const q = pairOf.get(cov[a] * 64 + cov[b]); if (!q) continue;
+        q.b[0] = Math.min(q.b[0], x - step / 2); q.b[1] = Math.min(q.b[1], y - step / 2); q.b[2] = Math.max(q.b[2], x + step / 2); q.b[3] = Math.max(q.b[3], y + step / 2);
+      }
+    }
+  }
+  if (!any) return { regions: [], area: null };
+  if (!maskCanvas || maskCanvas.width !== mw || maskCanvas.height !== mh) maskCanvas = mk(mw, mh);
+  maskCanvas.getContext('2d').putImageData(img, 0, 0);
+  // labelled regions are image-on-image overlaps; letters crossing images speak for themselves
+  const regions = pairs.filter(q => q.b[2] > q.b[0] && T[q.i].kind !== 'text' && T[q.j].kind !== 'text').map(q => ({ x: q.b[0], y: q.b[1], w: q.b[2] - q.b[0], h: q.b[3] - q.b[1] }));
+  return { regions, area: U, mask: maskCanvas };
 }
 
 // ---------- combining + color ----------
 function combine(L, x, y) {
-  const a = sample(L[0], x, y), b = sample(L[1], x, y);
+  // text layers are stencils: inside the letters, the effect is built from the images underneath
+  let M = L.filter(t => t.kind !== 'text');
+  if (!M.length) M = L;
   let v, col;
-  const fold = fn => { let c = a; for (let i = 1; i < L.length; i++) { const d = sample(L[i], x, y); c = c.map((q, k) => fn(q, d[k])); } return c; };
+  if (M.length === 1) {
+    col = sample(M[0], x, y); v = lum(col);
+    v = clamp((v - 0.5) * (S.contrast / 100) + 0.5);
+    if (S.invert) v = 1 - v;
+    return { v, col };
+  }
+  const a = sample(M[0], x, y), b = sample(M[1], x, y);
+  const fold = fn => { let c = a; for (let i = 1; i < M.length; i++) { const d = sample(M[i], x, y); c = c.map((q, k) => fn(q, d[k])); } return c; };
   switch (S.blend) {
     case 'top': v = lum(a); col = a; break;
     case 'plus': col = fold((q, d) => 1 - (1 - q) * (1 - d)); v = lum(col); break;
@@ -1022,23 +1124,27 @@ function render(editing) {
     for (let x = grid; x < W; x += grid) for (let y = grid; y < H; y += grid) ctx.fillRect(x - d / 2, y - d / 2, d, d);
   }
 
-  for (const t of S.tiles) drawTile(ctx, t);
+  for (const t of S.tiles) if (cuts(t)) drawTile(ctx, t);
 
-  const rects = overlapRects();
+  // overlaps follow the layers' real pixels; finer scan for exports
+  const ov = computeOverlaps(editing ? 4 : 2), rects = ov.regions;
   const amt = S.amount / 100;
-  if (rects.length && amt > 0) {
+  if (ov.area && amt > 0) {
     ctx.save();
-    ctx.beginPath(); for (const r of rects) ctx.rect(r.x, r.y, r.w, r.h); ctx.clip();
-    ctx.globalAlpha = amt; ctx.fillStyle = S.backdrop; ctx.fillRect(0, 0, W, H);
+    // backdrop in the exact shape of the overlap
+    const mc = ov.mask, mg = mc.getContext('2d');
+    mg.globalCompositeOperation = 'source-in'; mg.fillStyle = S.backdrop; mg.fillRect(0, 0, mc.width, mc.height);
     noisePat = noisePat || ctx.createPattern(noise, 'repeat');
-    ctx.globalAlpha = amt * 0.07; ctx.fillStyle = noisePat; ctx.fillRect(0, 0, W, H);
+    mg.globalCompositeOperation = 'source-atop'; mg.globalAlpha = 0.07; mg.fillStyle = noisePat; mg.fillRect(0, 0, mc.width, mc.height);
+    mg.globalAlpha = 1; mg.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = amt; ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(mc, ov.area.x0, ov.area.y0, mc.width * (editing ? 4 : 2), mc.height * (editing ? 4 : 2));
     ctx.globalAlpha = Math.min(1, amt * 1.6);
 
     const s = S.cell;
     ctx.font = `500 ${Math.round(s * 1.05)}px "Geist Mono", ui-monospace, monospace`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineCap = 'round';
-    let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
-    for (const r of rects) { bx0 = Math.min(bx0, r.x); by0 = Math.min(by0, r.y); bx1 = Math.max(bx1, r.x + r.w); by1 = Math.max(by1, r.y + r.h); }
+    const bx0 = ov.area.x0, by0 = ov.area.y0, bx1 = ov.area.x1, by1 = ov.area.y1;
     const base = STYLES.indexOf(S.style), thr = S.threshold / 100;
     for (let gy = Math.floor(by0 / s); gy * s < by1; gy++) {
       for (let gx = Math.floor(bx0 / s); gx * s < bx1; gx++) {
@@ -1053,6 +1159,9 @@ function render(editing) {
     }
     ctx.restore();
   }
+
+  // text that doesn't cut through sits on top of everything, as normal type
+  for (const t of S.tiles) if (!cuts(t)) drawTile(ctx, t);
 
   if (S.guides) drawGuides(rects);
   finish();
@@ -1125,23 +1234,27 @@ function drawEditorOverlay() {
   if (!t) return;
   const ui = uiScale();
   if (S.crop === t.id) {
-    // ghost of the full image outside the frame, Figma-style
-    const k = geom(t), gx = t.rx - k.sx * k.s, gy = t.ry - k.sy * k.s, gw = k.IW * k.s, gh = k.IH * k.s;
-    ctx.save();
-    ctx.beginPath(); ctx.rect(gx, gy, gw, gh); ctx.rect(t.rx, t.ry, t.w, t.h); ctx.clip('evenodd');
-    ctx.globalAlpha = 0.35; ctx.drawImage(t.img, gx, gy, gw, gh);
-    ctx.restore();
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1 * ui; ctx.setLineDash([4 * ui, 4 * ui]);
-    ctx.strokeRect(gx, gy, gw, gh); ctx.setLineDash([]);
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * ui; ctx.setLineDash([6 * ui, 4 * ui]); ctx.strokeRect(t.rx, t.ry, t.w, t.h); ctx.setLineDash([]);
+    // ghost of the full image outside the frame, Figma-style, in the layer's own (rotated) frame
+    withTile(ctx, t, () => {
+      const k = geom(t), gx = k.dx - k.sx * k.s, gy = k.dy - k.sy * k.s, gw = k.IW * k.s, gh = k.IH * k.s;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(gx, gy, gw, gh); ctx.rect(0, 0, t.w, t.h); ctx.clip('evenodd');
+      ctx.globalAlpha = 0.35; ctx.drawImage(t.img, gx, gy, gw, gh);
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1 * ui; ctx.setLineDash([4 * ui, 4 * ui]);
+      ctx.strokeRect(gx, gy, gw, gh);
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * ui; ctx.setLineDash([6 * ui, 4 * ui]); ctx.strokeRect(0, 0, t.w, t.h); ctx.setLineDash([]);
+    });
     return;
   }
-  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * ui;
-  ctx.strokeRect(t.rx, t.ry, t.w, t.h);
-  const hs = 9 * ui;
-  for (const [, x, y] of handles(t)) {
-    ctx.fillStyle = '#fff'; ctx.fillRect(x - hs / 2, y - hs / 2, hs, hs);
-    ctx.strokeStyle = '#0a0a0a'; ctx.lineWidth = 1.5 * ui; ctx.strokeRect(x - hs / 2, y - hs / 2, hs, hs);
+  withTile(ctx, t, () => { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * ui; ctx.strokeRect(0, 0, t.w, t.h); });
+  const hs = 9 * ui, hl = handles(t), top = toWorld(t, t.w / 2, 0), rh = hl.find(q => q[0] === 'rot');
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2 * ui; ctx.beginPath(); ctx.moveTo(top[0], top[1]); ctx.lineTo(rh[1], rh[2]); ctx.stroke();
+  for (const [id, x, y] of hl) {
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#0a0a0a'; ctx.lineWidth = 1.5 * ui;
+    if (id === 'rot') { ctx.beginPath(); ctx.arc(x, y, hs * 0.62, 0, TAU); ctx.fill(); ctx.stroke(); continue; }
+    ctx.save(); ctx.translate(x, y); if (t.rot) ctx.rotate(t.rot * Math.PI / 180);
+    ctx.fillRect(-hs / 2, -hs / 2, hs, hs); ctx.strokeRect(-hs / 2, -hs / 2, hs, hs); ctx.restore();
   }
 }
 
@@ -1162,16 +1275,18 @@ function drawGuides(rects) {
   ctx.globalAlpha = 1;
   ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1.2; ctx.setLineDash([6, 7]);
   ctx.beginPath();
-  for (const t of S.tiles) {
-    for (const y of [t.ry, t.ry + t.h]) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
-    for (const x of [t.rx, t.rx + t.w]) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+  const imgs = S.tiles.filter(t => t.kind !== 'text'), boxes = imgs.map(aabb);
+  for (const b of boxes) {
+    for (const y of [b.y0, b.y1]) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+    for (const x of [b.x0, b.x1]) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
   }
   ctx.stroke(); ctx.setLineDash([]);
   const sq = Math.max(6, Math.min(W, H) / 130);
-  S.tiles.forEach((t, i) => {
-    const h = chip(`C${i + 1}`, t.rx + t.w - 8, t.ry + 8, { alignRight: true });
-    chip(fmtCoord(t.rx, t.ry), t.rx + t.w - 8, t.ry + 8 + h + 4, { alignRight: true });
-    ctx.fillStyle = '#f3f1f4'; ctx.fillRect(t.rx + t.w - sq / 2, t.ry - sq / 2, sq, sq);
+  imgs.forEach((t, i) => {
+    const b = boxes[i];
+    const h = chip(codeOf(t), b.x1 - 8, b.y0 + 8, { alignRight: true });
+    chip(fmtCoord(t.rx, t.ry), b.x1 - 8, b.y0 + 8 + h + 4, { alignRight: true });
+    ctx.fillStyle = '#f3f1f4'; ctx.fillRect(b.x1 - sq / 2, b.y0 - sq / 2, sq, sq);
   });
   const mint = rgba(hex2rgb(S.lo));
   rects.forEach((r, i) => {
@@ -1188,17 +1303,30 @@ function toPoster(e) { const r = cv.getBoundingClientRect(); return { x: (e.clie
 function uiScale() { const r = cv.getBoundingClientRect(); return S.W / Math.max(1, r.width); }
 const snapV = v => S.snap ? Math.round(v / S.grid) * S.grid : Math.round(v);
 const minDim = () => S.snap ? S.grid : 20;
+// resize handles in the layer's own frame (text layers scale from their corners), plus a rotate handle above
 function handles(t) {
-  const x = t.rx, y = t.ry, { w, h } = t;
-  return [['nw', x, y], ['n', x + w / 2, y], ['ne', x + w, y], ['e', x + w, y + h / 2], ['se', x + w, y + h], ['s', x + w / 2, y + h], ['sw', x, y + h], ['w', x, y + h / 2]];
+  const { w, h } = t, ui = uiScale();
+  const local = t.kind === 'text'
+    ? [['nw', 0, 0], ['ne', w, 0], ['se', w, h], ['sw', 0, h]]
+    : [['nw', 0, 0], ['n', w / 2, 0], ['ne', w, 0], ['e', w, h / 2], ['se', w, h], ['s', w / 2, h], ['sw', 0, h], ['w', 0, h / 2]];
+  local.push(['rot', w / 2, -26 * ui]);
+  return local.map(([id, u, v]) => [id, ...toWorld(t, u, v)]);
 }
-const CURSORS = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', move: 'move', pan: 'grab' };
-const inside = (t, p) => p.x >= t.rx && p.x < t.rx + t.w && p.y >= t.ry && p.y < t.ry + t.h;
+const RESIZE_CURSOR = ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize'];
+const HANDLE_ANGLE = { e: 0, se: 45, s: 90, sw: 135, w: 180, nw: 225, n: 270, ne: 315 };
+function cursorFor(mode, t) {
+  if (mode === 'move') return 'move';
+  if (mode === 'pan') return 'grab';
+  if (mode === 'rot') return 'grab';
+  const a = ((HANDLE_ANGLE[mode] + (t.rot || 0)) % 180 + 180) % 180;
+  return RESIZE_CURSOR[Math.round(a / 45) % 4];
+}
+const inside = (t, p) => { const [u, v] = toLocal(t, p.x, p.y); return u >= 0 && v >= 0 && u < t.w && v < t.h; };
 function hit(p) {
   const ct = S.crop && S.tiles.find(t => t.id === S.crop);
   if (ct) return inside(ct, p) ? { t: ct, mode: 'pan' } : null;
   const st = selTile(), r = 10 * uiScale();
-  if (st) for (const [id, x, y] of handles(st)) if (Math.abs(p.x - x) < r && Math.abs(p.y - y) < r) return { t: st, mode: id };
+  if (st) for (const [id, x, y] of handles(st)) if (Math.hypot(p.x - x, p.y - y) < r * 1.2) return { t: st, mode: id };
   for (let i = S.tiles.length - 1; i >= 0; i--) if (inside(S.tiles[i], p)) return { t: S.tiles[i], mode: 'move' };
   return null;
 }
@@ -1207,38 +1335,75 @@ cv.addEventListener('pointerdown', e => {
   const p = toPoster(e), h = hit(p);
   if (!h) { if (S.crop) exitCrop(); else select(null); return; }
   if (S.sel !== h.t.id) select(h.t.id);
-  const t = h.t, k = geom(t);
-  drag = { mode: h.mode, t, px: p.x, py: p.y, ox: t.rx - t.x, oy: t.ry - t.y, o: { x: t.x, y: t.y, w: t.w, h: t.h }, sx: k.sx, sy: k.sy };
+  const t = h.t, k = geom(t), cx = t.rx + t.w / 2, cy = t.ry + t.h / 2;
+  drag = { mode: h.mode, t, px: p.x, py: p.y, ox: t.rx - t.x, oy: t.ry - t.y, o: { x: t.x, y: t.y, w: t.w, h: t.h, rot: t.rot || 0, size: t.size },
+    cx, cy, a0: Math.atan2(p.y - cy, p.x - cx), sx: k.sx, sy: k.sy };
   cv.setPointerCapture(e.pointerId);
-  cv.style.cursor = h.mode === 'pan' ? 'grabbing' : CURSORS[h.mode];
+  cv.style.cursor = h.mode === 'pan' || h.mode === 'rot' ? 'grabbing' : cursorFor(h.mode, t);
 });
 cv.addEventListener('pointermove', e => {
   const p = toPoster(e);
-  if (!drag) { const h = hit(p); cv.style.cursor = h ? CURSORS[h.mode] : 'default'; return; }
+  if (!drag) { const h = hit(p); cv.style.cursor = h ? cursorFor(h.mode, h.t) : 'default'; return; }
   const t = drag.t, o = drag.o, m = drag.mode, md = minDim();
   if (m === 'move') {
     t.x = clamp(snapV(o.x + p.x - drag.px), -t.w + md, S.W - md);
     t.y = clamp(snapV(o.y + p.y - drag.py), -t.h + md, S.H - md);
+  } else if (m === 'rot') {
+    let a = o.rot + (Math.atan2(p.y - drag.cy, p.x - drag.cx) - drag.a0) * 180 / Math.PI;
+    a = ((a + 540) % 360) - 180;
+    if (e.shiftKey) a = Math.round(a / 15) * 15; else if (Math.abs(a) < 3) a = 0;
+    t.rot = Math.round(a * 10) / 10; syncSel();
   } else if (m === 'pan') {
-    const k = geom(t);
-    const sx = drag.sx - (p.x - drag.px) / k.s, sy = drag.sy - (p.y - drag.py) / k.s;
+    const k = geom(t), dx = p.x - drag.px, dy = p.y - drag.py, c = Math.cos((t.rot || 0) * Math.PI / 180), sn = Math.sin((t.rot || 0) * Math.PI / 180);
+    const du = dx * c + dy * sn, dv = -dx * sn + dy * c;
+    const sx = drag.sx - du / k.s, sy = drag.sy - dv / k.s;
     if (k.IW - k.sw > 0.5) t.fx = clamp((sx / (k.IW - k.sw) - 0.5) * 2, -1, 1);
     if (k.IH - k.sh > 0.5) t.fy = clamp((sy / (k.IH - k.sh) - 0.5) * 2, -1, 1);
     syncSel();
   } else {
-    const right = o.x + o.w, bottom = o.y + o.h;
-    p.x -= drag.ox; p.y -= drag.oy;
-    if (m.includes('e')) t.w = Math.max(md, snapV(p.x) - o.x);
-    if (m.includes('w')) { const nx = Math.min(snapV(p.x), right - md); t.x = nx; t.w = right - nx; }
-    if (m.includes('s')) t.h = Math.max(md, snapV(p.y) - o.y);
-    if (m.includes('n')) { const ny = Math.min(snapV(p.y), bottom - md); t.y = ny; t.h = bottom - ny; }
+    resizeTo(t, m, p, e.shiftKey);
   }
   requestRender(); updateStatus();
 });
+// Resize in the layer's own frame so rotated layers resize along their edges; the opposite edge stays put.
+function resizeTo(t, m, p, keepRatio) {
+  const o = drag.o, a = o.rot * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
+  const dx = p.x - drag.cx, dy = p.y - drag.cy, lx = dx * c + dy * sn, ly = -dx * sn + dy * c;
+  const md = minDim();
+  let L = -o.w / 2, R = o.w / 2, T = -o.h / 2, B = o.h / 2;
+  if (m.includes('e')) R = Math.max(L + md, lx);
+  if (m.includes('w')) L = Math.min(R - md, lx);
+  if (m.includes('s')) B = Math.max(T + md, ly);
+  if (m.includes('n')) T = Math.min(B - md, ly);
+  if (!o.rot && S.snap && t.kind !== 'text') {
+    // unrotated: snap the moving edges to the grid in poster coordinates
+    const bx = drag.cx - drag.ox, by = drag.cy - drag.oy;
+    if (m.includes('e')) R = Math.max(L + md, snapV(bx + R) - bx);
+    if (m.includes('w')) L = Math.min(R - md, snapV(bx + L) - bx);
+    if (m.includes('s')) B = Math.max(T + md, snapV(by + B) - by);
+    if (m.includes('n')) T = Math.min(B - md, snapV(by + T) - by);
+  }
+  let nw = R - L, nh = B - T;
+  if (t.kind === 'text' || keepRatio) {
+    const k = Math.max(nw / o.w, nh / o.h);
+    nw = o.w * k; nh = o.h * k;
+    if (t.kind === 'text') { t.size = Math.max(6, Math.round(o.size * k)); layoutText(t); nw = t.w; nh = t.h; }
+  }
+  // keep the anchor (the side opposite the handle) where it was
+  const lcx = m.includes('e') ? -o.w / 2 + nw / 2 : m.includes('w') ? o.w / 2 - nw / 2 : 0;
+  const lcy = m.includes('s') ? -o.h / 2 + nh / 2 : m.includes('n') ? o.h / 2 - nh / 2 : 0;
+  const wx = drag.cx + lcx * c - lcy * sn, wy = drag.cy + lcx * sn + lcy * c;
+  t.w = nw; t.h = nh; t.x = wx - nw / 2 - drag.ox; t.y = wy - nh / 2 - drag.oy;
+  t.rx = t.x + drag.ox; t.ry = t.y + drag.oy;
+  if (t.kind === 'text') syncSel();
+}
 const endDrag = () => { if (drag) { drag = null; renderLayers(); } };
 cv.addEventListener('pointerup', endDrag);
 cv.addEventListener('pointercancel', endDrag);
-cv.addEventListener('dblclick', e => { const h = hit(toPoster(e)); if (h && !S.crop) enterCrop(h.t.id); });
+cv.addEventListener('dblclick', e => {
+  const h = hit(toPoster(e)); if (!h || S.crop) return;
+  if (h.t.kind === 'text') { select(h.t.id); editText(); } else enterCrop(h.t.id);
+});
 cv.addEventListener('wheel', e => {
   if (!S.crop) return;
   const t = S.tiles.find(t => t.id === S.crop); if (!t) return;
@@ -1247,7 +1412,7 @@ cv.addEventListener('wheel', e => {
   syncSel(); requestRender();
 }, { passive: false });
 
-function enterCrop(id) { S.sel = id; S.crop = id; renderLayers(); requestRender(); }
+function enterCrop(id) { const t = S.tiles.find(q => q.id === id); if (!t || t.kind === 'text') return; S.sel = id; S.crop = id; renderLayers(); requestRender(); }
 function exitCrop() { S.crop = null; renderLayers(); requestRender(); }
 function select(id) { S.sel = id; if (S.crop && S.crop !== id) S.crop = null; renderLayers(); requestRender(); }
 
@@ -1257,7 +1422,7 @@ document.addEventListener('keydown', e => {
   if (!document.getElementById('modal').hidden) return;
   const t = selTile(); if (!t) return;
   if (e.key === 'Escape') { if (S.crop) exitCrop(); else select(null); return; }
-  if (e.key === 'Enter') { S.crop ? exitCrop() : enterCrop(t.id); e.preventDefault(); return; }
+  if (e.key === 'Enter') { if (t.kind === 'text') editText(); else S.crop ? exitCrop() : enterCrop(t.id); e.preventDefault(); return; }
   const g = S.snap ? S.grid : 10;
   const moves = { ArrowLeft: [-g, 0], ArrowRight: [g, 0], ArrowUp: [0, -g], ArrowDown: [0, g] };
   if (moves[e.key] && !S.crop) { t.x += moves[e.key][0]; t.y += moves[e.key][1]; e.preventDefault(); requestRender(); updateStatus(); }
@@ -1282,13 +1447,17 @@ function renderLayers() {
   updateEmpty();
   document.getElementById('count').textContent = `${S.tiles.length} layer${S.tiles.length === 1 ? '' : 's'}`;
   layersEl.innerHTML = '';
-  if (!S.tiles.length) { layersEl.innerHTML = '<li class="empty">No images yet. Add two or more, and the effect appears where they overlap.</li>'; }
+  if (!S.tiles.length) { layersEl.innerHTML = '<li class="empty">No layers yet. Add images or text, and the effect appears where they overlap.</li>'; }
   S.tiles.map((t, i) => [t, i]).reverse().forEach(([t, i]) => {
     const li = document.createElement('li');
     li.className = 'layer' + (S.sel === t.id ? ' sel' : '');
-    const th = mk(72, 72); drawCoverPlain(th.getContext('2d'), t.img, 0, 0, 72, 72);
+    const th = mk(72, 72), tg = th.getContext('2d');
+    if (t.kind === 'text') {
+      tg.fillStyle = '#1b1b1a'; tg.fillRect(0, 0, 72, 72);
+      const k = Math.min(64 / t.w, 64 / t.h); tg.drawImage(t.img, (72 - t.w * k) / 2, (72 - t.h * k) / 2, t.w * k, t.h * k);
+    } else drawCoverPlain(tg, t.img, 0, 0, 72, 72);
     const nm = document.createElement('div'); nm.className = 'nm';
-    const b = document.createElement('b'); b.textContent = `C${i + 1}`; nm.append(b, t.name);
+    const b = document.createElement('b'); b.textContent = codeOf(t); nm.append(b, t.name);
     const acts = document.createElement('div'); acts.className = 'acts';
     const mkb = (txt, label, fn) => { const bt = document.createElement('button'); bt.type = 'button'; bt.textContent = txt; bt.title = label; bt.setAttribute('aria-label', label); bt.onclick = ev => { ev.stopPropagation(); fn(); }; acts.append(bt); };
     mkb('↑', 'Bring forward', () => moveZ(t.id, 1));
@@ -1301,19 +1470,114 @@ function renderLayers() {
   syncSel(); updateStatus();
 }
 const zoomEl = document.getElementById('zoom'), panXEl = document.getElementById('panX'), panYEl = document.getElementById('panY');
+const rotEl = document.getElementById('rot');
+const txt = id => document.getElementById(id);
 function syncSel() {
   const t = selTile();
   document.getElementById('selSection').hidden = !t;
   if (!t) return;
+  const isText = t.kind === 'text';
+  document.getElementById('selTitle').textContent = isText ? 'Selected text' : 'Selected image';
   document.getElementById('selCode').textContent = codeOf(t);
   document.getElementById('selName').textContent = t.name;
-  const cb = document.getElementById('cropBtn');
-  cb.setAttribute('aria-pressed', String(S.crop === t.id)); cb.textContent = S.crop === t.id ? 'Done cropping' : 'Crop';
-  zoomEl.value = Math.round(t.zoom * 100); document.getElementById('zoomV').textContent = Math.round(t.zoom * 100) + '%';
-  panXEl.value = Math.round(t.fx * 100); document.getElementById('panXV').textContent = Math.round(t.fx * 100);
-  panYEl.value = Math.round(t.fy * 100); document.getElementById('panYV').textContent = Math.round(t.fy * 100);
-  [zoomEl, panXEl, panYEl].forEach(paintRange);
+  document.getElementById('imgProps').hidden = isText;
+  document.getElementById('textProps').hidden = !isText;
+  document.getElementById('selNote').textContent = isText
+    ? 'Double-click the text on the canvas to edit it. Drag a corner to scale, or the round handle to rotate (Shift snaps to 15°).'
+    : 'Double-click an image to crop it on the canvas. Drag the round handle to rotate (Shift snaps to 15°).';
+  rotEl.value = Math.round(t.rot || 0); document.getElementById('rotV').textContent = `${Math.round(t.rot || 0)}°`;
+  if (isText) {
+    if (document.activeElement !== txt('txtContent')) txt('txtContent').value = t.text;
+    txt('txtFont').value = t.font;
+    const info = FONTS[t.font];
+    txt('txtWeight').querySelectorAll('button[data-v]').forEach(b => {
+      if (b.dataset.v === 'italic') { b.disabled = !info.italic; b.setAttribute('aria-pressed', String(!!t.italic && info.italic)); return; }
+      b.disabled = !info.w.includes(+b.dataset.v); b.setAttribute('aria-pressed', String(t.weight === +b.dataset.v));
+    });
+    txt('txtSize').value = t.size; txt('txtSizeV').textContent = `${t.size} px`;
+    txt('txtTrack').value = t.track; txt('txtTrackV').textContent = `${t.track > 0 ? '+' : ''}${t.track}`;
+    txt('txtLead').value = t.lead; txt('txtLeadV').textContent = (t.lead / 100).toFixed(2);
+    txt('txtAlign').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(t.align === b.dataset.v)));
+    txt('txtColor').value = t.color; txt('txtColorV').textContent = t.color;
+    txt('txtCut').checked = t.cut;
+    ['txtSize', 'txtTrack', 'txtLead'].forEach(id => paintRange(txt(id)));
+  } else {
+    const cb = document.getElementById('cropBtn');
+    cb.setAttribute('aria-pressed', String(S.crop === t.id)); cb.textContent = S.crop === t.id ? 'Done cropping' : 'Crop';
+    zoomEl.value = Math.round(t.zoom * 100); document.getElementById('zoomV').textContent = Math.round(t.zoom * 100) + '%';
+    panXEl.value = Math.round(t.fx * 100); document.getElementById('panXV').textContent = Math.round(t.fx * 100);
+    panYEl.value = Math.round(t.fy * 100); document.getElementById('panYV').textContent = Math.round(t.fy * 100);
+    [zoomEl, panXEl, panYEl].forEach(paintRange);
+  }
+  paintRange(rotEl);
 }
+rotEl.addEventListener('input', () => { const t = selTile(); if (t) { t.rot = +rotEl.value; syncSel(); requestRender(); } });
+
+// ---------- text layers ----------
+const FONTS = {
+  'Archivo': { w: [400, 700, 900], italic: true, fb: 'Arial, Helvetica, sans-serif' },
+  'Instrument Serif': { w: [400], italic: true, fb: 'Georgia, "Times New Roman", serif' },
+  'Unbounded': { w: [400, 700, 900], italic: false, fb: '"Arial Black", Arial, sans-serif' },
+  'Geist': { w: [400, 700, 900], italic: false, fb: 'system-ui, -apple-system, sans-serif' },
+  'Martian Mono': { w: [400, 700], italic: false, fb: 'ui-monospace, Menlo, monospace' },
+};
+const fontOf = t => `${t.italic ? 'italic ' : ''}${t.weight} ${t.size}px "${t.font}", ${FONTS[t.font].fb}`;
+// Lay the text out into its own transparent canvas; the layer's frame is the text's bounds.
+// Letter spacing is drawn character by character; without it, whole lines keep the font's kerning.
+function layoutText(t) {
+  const meas = mk(1, 1).getContext('2d'); meas.font = fontOf(t);
+  const lines = (t.text || ' ').split('\n'), track = t.track / 100 * t.size;
+  const widthOf = l => track ? [...l].reduce((w, ch) => w + meas.measureText(ch).width, 0) + track * Math.max(0, [...l].length - 1) : meas.measureText(l).width;
+  const widths = lines.map(widthOf), m = meas.measureText('ÉHgjy');
+  const asc = m.fontBoundingBoxAscent || t.size * 0.92, desc = m.fontBoundingBoxDescent || t.size * 0.26;
+  const lh = t.size * t.lead / 100, pad = Math.ceil(t.size * 0.14);
+  const W = Math.max(2, Math.ceil(Math.max(...widths) + pad * 2)), H = Math.max(2, Math.ceil(lh * (lines.length - 1) + asc + desc + pad * 2));
+  const c = mk(W, H), g = c.getContext('2d');
+  g.font = fontOf(t); g.fillStyle = t.color; g.textBaseline = 'alphabetic';
+  lines.forEach((l, i) => {
+    const y = pad + asc + i * lh, w = widths[i];
+    let x = t.align === 'left' ? pad : t.align === 'right' ? W - pad - w : (W - w) / 2;
+    if (!track) { g.fillText(l, x, y); return; }
+    for (const ch of l) { g.fillText(ch, x, y); x += meas.measureText(ch).width + track; }
+  });
+  t.img = c; t.w = W; t.h = H; t.ver++;
+}
+// re-layout keeping the text centred where it was
+function renderText(t) {
+  const cx = t.x + t.w / 2, cy = t.y + t.h / 2;
+  layoutText(t);
+  t.x = cx - t.w / 2; t.y = cy - t.h / 2; t.rx = t.x; t.ry = t.y;
+  t.name = (t.text.split('\n')[0] || 'Text').slice(0, 40);
+  requestRender();
+}
+function addText() {
+  const t = { id: nextId++, kind: 'text', img: null, name: 'Text', x: S.W / 2, y: S.H / 2, w: 0, h: 0, rx: 0, ry: 0, rot: 0, fit: 'cover', zoom: 1, fx: 0, fy: 0, ver: 0, cache: null,
+    text: 'OVERLAP', font: 'Archivo', weight: 900, italic: false, size: Math.round(Math.min(S.W, S.H) * 0.2), track: -2, lead: 90, align: 'center', color: '#f3f1f4', cut: true };
+  layoutText(t); t.x = (S.W - t.w) / 2; t.y = (S.H - t.h) / 2; t.rx = t.x; t.ry = t.y;
+  S.tiles.push(t); renderText(t);
+  showTab('images'); select(t.id); editText();
+  document.fonts.load(fontOf(t)).then(() => renderText(t)).catch(() => {});
+}
+function editText() { const el = txt('txtContent'); showTab('images'); setTimeout(() => { el.focus(); el.select(); }, 0); }
+document.getElementById('addText').addEventListener('click', addText);
+const onText = fn => { const t = selTile(); if (!t || t.kind !== 'text') return; fn(t); renderText(t); syncSel(); };
+const refreshName = () => { const t = selTile(); if (!t) return; const row = layersEl.querySelector('.layer.sel .nm'); if (row) row.lastChild.textContent = t.name; document.getElementById('selName').textContent = t.name; };
+txt('txtContent').addEventListener('input', e => onText(t => { t.text = e.target.value; refreshName(); }));
+txt('txtFont').addEventListener('change', e => onText(t => {
+  t.font = e.target.value; const info = FONTS[t.font];
+  if (!info.w.includes(t.weight)) t.weight = info.w.reduce((a, b) => Math.abs(b - t.weight) < Math.abs(a - t.weight) ? b : a);
+  if (!info.italic) t.italic = false;
+  document.fonts.load(fontOf(t)).then(() => renderText(t)).catch(() => {});
+}));
+txt('txtWeight').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled) return; onText(t => { if (b.dataset.v === 'italic') t.italic = !t.italic; else t.weight = +b.dataset.v; document.fonts.load(fontOf(t)).then(() => renderText(t)).catch(() => {}); }); });
+txt('txtAlign').addEventListener('click', e => { const b = e.target.closest('button'); if (b) onText(t => { t.align = b.dataset.v; }); });
+txt('txtSize').addEventListener('input', e => onText(t => { t.size = +e.target.value; }));
+txt('txtTrack').addEventListener('input', e => onText(t => { t.track = +e.target.value; }));
+txt('txtLead').addEventListener('input', e => onText(t => { t.lead = +e.target.value; }));
+txt('txtColor').addEventListener('input', e => onText(t => { t.color = e.target.value; }));
+txt('txtCut').addEventListener('change', e => onText(t => { t.cut = e.target.checked; }));
+document.fonts && document.fonts.ready.then(() => S.tiles.filter(t => t.kind === 'text').forEach(renderText));
+
 zoomEl.addEventListener('input', () => { const t = selTile(); if (t) { t.zoom = zoomEl.value / 100; syncSel(); requestRender(); } });
 panXEl.addEventListener('input', () => { const t = selTile(); if (t) { t.fx = panXEl.value / 100; syncSel(); requestRender(); } });
 panYEl.addEventListener('input', () => { const t = selTile(); if (t) { t.fy = panYEl.value / 100; syncSel(); requestRender(); } });
@@ -1326,8 +1590,8 @@ document.getElementById('fitBtn').addEventListener('click', () => {
 });
 document.getElementById('dupBtn').addEventListener('click', () => {
   const t = selTile(); if (!t) return;
-  const c = addTile(t.img, t.name + ' copy', t.x + S.grid, t.y + S.grid, t.w, t.h);
-  Object.assign(c, { zoom: t.zoom, fx: t.fx, fy: t.fy });
+  const c = { ...t, id: nextId++, cache: null, _rot: undefined, name: t.name + ' copy', x: t.x + S.grid, y: t.y + S.grid };
+  c.rx = c.x; c.ry = c.y; S.tiles.push(c);
   select(c.id);
 });
 document.getElementById('delBtn').addEventListener('click', () => { const t = selTile(); if (t) removeTile(t.id); });
@@ -1336,13 +1600,15 @@ function updateStatus() {
   const el = document.getElementById('statusbar'), t = selTile();
   if (!t) {
     el.innerHTML = S.tiles.length
-      ? '<span><kbd>Click</kbd>select</span><span><kbd>Double-click</kbd>crop</span><span><kbd>Drop</kbd>add images</span>'
+      ? '<span><kbd>Click</kbd>select</span><span><kbd>Double-click</kbd>crop or edit text</span><span><kbd>Drop</kbd>add images</span>'
       : '<span><kbd>Drop</kbd>or <kbd>Paste</kbd>images to begin</span>';
     return;
   }
   const k = codeOf(t);
   if (S.crop === t.id) { el.innerHTML = `<span class="crop"><b>${k}</b> cropping</span><span><kbd>Drag</kbd>reposition</span><span><kbd>Scroll</kbd>zoom</span><span><kbd>Esc</kbd>done</span>`; return; }
-  el.innerHTML = `<span><b>${k}</b> ${Math.round(t.w)} × ${Math.round(t.h)} at ${fmtCoord(t.x, t.y)}</span><span><kbd>Handles</kbd>resize</span><span><kbd>←↑↓→</kbd>nudge</span><span><kbd>Enter</kbd>crop</span><span><kbd>Del</kbd>remove</span>`;
+  el.innerHTML = t.kind === 'text'
+    ? `<span><b>${k}</b> ${t.size} px ${t.font}</span><span><kbd>Corners</kbd>scale</span><span><kbd>○</kbd>rotate</span><span><kbd>Enter</kbd>edit text</span><span><kbd>Del</kbd>remove</span>`
+    : `<span><b>${k}</b> ${Math.round(t.w)} × ${Math.round(t.h)} at ${fmtCoord(t.x, t.y)}</span><span><kbd>Handles</kbd>resize</span><span><kbd>○</kbd>rotate</span><span><kbd>Enter</kbd>crop</span><span><kbd>Del</kbd>remove</span>`;
 }
 
 // ---------- uploads ----------
@@ -1372,6 +1638,7 @@ document.addEventListener('paste', e => { const fs = [...(e.clipboardData?.files
 document.getElementById('shuffle').addEventListener('click', () => {
   const R = Math.random, g = S.grid, cw = Math.floor(S.W / g), chh = Math.floor(S.H / g);
   S.tiles.forEach((t, i) => {
+    if (t.kind === 'text') { t.x = clamp(snapV(R() * (S.W - t.w)), 0, Math.max(0, S.W - t.w)); t.y = clamp(snapV(R() * (S.H - t.h)), 0, Math.max(0, S.H - t.h)); return; }
     const w = Math.max(3, Math.round(cw * (0.35 + R() * 0.3))) * g, h = Math.max(3, Math.round(chh * (0.25 + R() * 0.3))) * g;
     let x, y;
     if (i === 0) { x = Math.floor(R() * (cw - w / g + 1)) * g; y = Math.floor(R() * (chh - h / g + 1)) * g; }
@@ -1535,7 +1802,10 @@ function applySize() {
   S.W = cv.width = w; S.H = cv.height = h;
   S.grid = clamp(Math.round(Math.min(w, h) / 12 / 5) * 5, 10, 240);
   S.cell = clamp(Math.round(S.cell * Math.sqrt(sx * sy)), 4, 120);
-  for (const t of S.tiles) { t.x = snapV(t.x * sx); t.y = snapV(t.y * sy); t.w = Math.max(minDim(), snapV(t.w * sx)); t.h = Math.max(minDim(), snapV(t.h * sy)); }
+  for (const t of S.tiles) {
+    if (t.kind === 'text') { const cx = (t.x + t.w / 2) * sx, cy = (t.y + t.h / 2) * sy; t.size = Math.max(6, Math.round(t.size * Math.min(sx, sy))); layoutText(t); t.x = cx - t.w / 2; t.y = cy - t.h / 2; continue; }
+    t.x = snapV(t.x * sx); t.y = snapV(t.y * sy); t.w = Math.max(minDim(), snapV(t.w * sx)); t.h = Math.max(minDim(), snapV(t.h * sy));
+  }
   noisePat = null;
   document.getElementById('sizeLabel').textContent = `${w} × ${h}`;
   document.getElementById('ratioLabel').textContent = ratioLabel(w, h);

@@ -508,6 +508,25 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
             <div class="field"><label for="panX">Horizontal position <span class="val" id="panXV"></span></label><input id="panX" type="range" min="-100" max="100"></div>
             <div class="field"><label for="panY">Vertical position <span class="val" id="panYV"></span></label><input id="panY" type="range" min="-100" max="100"></div>
             <div class="row"><button class="btn small" id="resetCrop" type="button">Reset crop</button></div>
+            <div class="field"><span class="lbl">Frame shape</span>
+              <div class="seg" id="shapeSeg" style="--cols:4">
+                <button type="button" data-v="rect"><span class="glyph">▭</span>Rect</button>
+                <button type="button" data-v="round"><span class="glyph">▢</span>Rounded</button>
+                <button type="button" data-v="circle"><span class="glyph">◯</span>Circle</button>
+                <button type="button" data-v="pill"><span class="glyph">⬭</span>Pill</button>
+                <button type="button" data-v="arch"><span class="glyph">⌓</span>Arch</button>
+                <button type="button" data-v="diamond"><span class="glyph">◇</span>Diamond</button>
+                <button type="button" data-v="star"><span class="glyph">☆</span>Star</button>
+              </div>
+            </div>
+            <div class="field"><span class="lbl">Remove background <span class="val" id="bgState"></span></span>
+              <div class="row">
+                <button class="btn small" id="bgPerson" type="button" title="Fast, made for people. 7 MB, downloaded once.">Person · 7 MB</button>
+                <button class="btn small" id="bgAny" type="button" title="Best quality on any subject. 115 MB, downloaded once. Needs WebGPU (recent Chrome or Edge).">Any subject · 115 MB</button>
+              </div>
+              <div class="row"><button class="btn small" id="bgRestore" type="button" hidden>Restore background</button></div>
+              <p class="note">Runs on your device, so the image never leaves it. The model downloads the first time, then your browser keeps it.</p>
+            </div>
           </div>
 
           <div class="props" id="textProps" hidden>
@@ -722,7 +741,25 @@ function geom(t) {
   const dw = sw * s, dh = sh * s;
   return { IW, IH, s, sw, sh, sx, sy, dx: (t.w - dw) / 2, dy: (t.h - dh) / 2, dw, dh };
 }
-function drawContent(g, t) { const k = geom(t); g.drawImage(t.img, k.sx, k.sy, k.sw, k.sh, k.dx, k.dy, k.dw, k.dh); }
+function shapePath(g, shape, w, h) {
+  const m = Math.min(w, h);
+  g.beginPath();
+  switch (shape) {
+    case 'round': g.roundRect(0, 0, w, h, m * 0.12); break;
+    case 'pill': g.roundRect(0, 0, w, h, m / 2); break;
+    case 'circle': g.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, TAU); break;
+    case 'arch': { const ry = Math.min(w / 2, h); g.moveTo(0, h); g.lineTo(0, ry); g.ellipse(w / 2, ry, w / 2, ry, 0, Math.PI, 0); g.lineTo(w, h); g.closePath(); break; }
+    case 'diamond': g.moveTo(w / 2, 0); g.lineTo(w, h / 2); g.lineTo(w / 2, h); g.lineTo(0, h / 2); g.closePath(); break;
+    case 'star': for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.45 : 1; g[i ? 'lineTo' : 'moveTo'](w / 2 + Math.cos(a) * w / 2 * r, h / 2 + Math.sin(a) * h / 2 * r); } g.closePath(); break;
+    default: g.rect(0, 0, w, h);
+  }
+}
+function drawContent(g, t) {
+  const k = geom(t), shaped = t.kind !== 'text' && t.shape && t.shape !== 'rect';
+  if (shaped) { g.save(); shapePath(g, t.shape, t.w, t.h); g.clip(); }
+  g.drawImage(t.img, k.sx, k.sy, k.sw, k.sh, k.dx, k.dy, k.dw, k.dh);
+  if (shaped) g.restore();
+}
 // rotation: layers turn around their centre
 function trig(t) { if (t._rot !== t.rot) { const a = (t.rot || 0) * Math.PI / 180; t._c = Math.cos(a); t._s = Math.sin(a); t._rot = t.rot; } }
 function toLocal(t, x, y) { trig(t); const dx = x - (t.rx + t.w / 2), dy = y - (t.ry + t.h / 2); return [dx * t._c + dy * t._s + t.w / 2, -dx * t._s + dy * t._c + t.h / 2]; }
@@ -818,7 +855,7 @@ let noisePat = null;
 
 // ---------- layers ----------
 function addTile(img, name, x, y, w, h) {
-  const t = { id: nextId++, kind: 'image', img, name, x, y, w, h, rx: x, ry: y, rot: 0, fit: 'cover', zoom: 1, fx: 0, fy: 0, ver: 0, cache: null };
+  const t = { id: nextId++, kind: 'image', img, name, x, y, w, h, rx: x, ry: y, rot: 0, fit: 'cover', shape: 'rect', zoom: 1, fx: 0, fy: 0, ver: 0, cache: null };
   S.tiles.push(t); return t;
 }
 const selTile = () => S.tiles.find(t => t.id === S.sel) || null;
@@ -826,7 +863,7 @@ const codeOf = t => (t.kind === 'text' ? 'T' : 'C') + (S.tiles.filter(q => q.kin
 // a small copy of each layer in its own frame; its alpha says where the layer really has pixels
 function getCache(t) {
   const cw = Math.max(1, Math.ceil(t.w / DS)), ch = Math.max(1, Math.ceil(t.h / DS));
-  const key = `${cw}|${ch}|${t.zoom}|${t.fx}|${t.fy}|${t.fit}|${t.ver}`;
+  const key = `${cw}|${ch}|${t.zoom}|${t.fx}|${t.fy}|${t.fit}|${t.shape}|${t.ver}`;
   if (t.cache && t.cache.key === key) return t.cache;
   const c = mk(cw, ch), g = c.getContext('2d', { willReadFrequently: true });
   g.imageSmoothingQuality = 'high'; g.scale(cw / t.w, ch / t.h); drawContent(g, t);
@@ -1289,9 +1326,14 @@ function drawGuides(rects) {
     ctx.fillStyle = '#f3f1f4'; ctx.fillRect(b.x1 - sq / 2, b.y0 - sq / 2, sq, sq);
   });
   const mint = rgba(hex2rgb(S.lo));
+  const fs = Math.round(Math.min(S.W, S.H * 1.2) / 54), ch = fs * 1.5, cw = fs * 2.6, placed = [];
+  const clash = (x, y) => placed.some(q => x < q[0] + cw && x + cw > q[0] && y < q[1] + ch && y + ch > q[1]);
   rects.forEach((r, i) => {
-    const fs = Math.round(Math.min(S.W, S.H * 1.2) / 54), h = fs * 1.5;
-    chip(`S${String(i + 1).padStart(2, '0')}`, r.x, r.y - h - 2, { border: mint });
+    // above the overlap, else just inside it, else below; skip the label if all three collide
+    const y = [r.y - ch - 2, r.y + 4, r.y + r.h + 4].find(y => !clash(r.x, y));
+    if (y === undefined) return;
+    placed.push([r.x, y]);
+    chip(`S${String(i + 1).padStart(2, '0')}`, r.x, y, { border: mint });
     ctx.fillStyle = mint;
     ctx.fillRect(r.x - sq / 2, r.y - sq / 2, sq, sq);
     ctx.fillRect(r.x + r.w - sq / 2, r.y + r.h - sq / 2, sq, sq);
@@ -1508,10 +1550,94 @@ function syncSel() {
     panXEl.value = Math.round(t.fx * 100); document.getElementById('panXV').textContent = Math.round(t.fx * 100);
     panYEl.value = Math.round(t.fy * 100); document.getElementById('panYV').textContent = Math.round(t.fy * 100);
     [zoomEl, panXEl, panYEl].forEach(paintRange);
+    document.querySelectorAll('#shapeSeg button').forEach(b => b.setAttribute('aria-pressed', String((t.shape || 'rect') === b.dataset.v)));
+    document.getElementById('bgRestore').hidden = !t.orig;
+    document.getElementById('bgAny').disabled = !('gpu' in navigator) || bgBusy;
+    document.getElementById('bgPerson').disabled = bgBusy;
   }
   paintRange(rotEl);
 }
 rotEl.addEventListener('input', () => { const t = selTile(); if (t) { t.rot = +rotEl.value; syncSel(); requestRender(); } });
+document.getElementById('shapeSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'), t = selTile(); if (!b || !t || t.kind === 'text') return;
+  t.shape = b.dataset.v; syncSel(); requestRender();
+});
+
+// ---------- cutouts ----------
+// Crop a canvas to its visible pixels. Returns null when nothing is visible.
+function trimAlpha(src) {
+  const w = src.width, h = src.height, d = src.getContext('2d').getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 16) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return null;
+  const c = mk(x1 - x0 + 1, y1 - y0 + 1); c.getContext('2d').drawImage(src, -x0, -y0);
+  return { canvas: c, box: [x0, y0, x1 + 1, y1 + 1] };
+}
+// Does an image have real transparency? Checked on a small copy.
+function hasTransparency(img) {
+  const k = Math.min(1, 256 / Math.max(iw(img), ih(img))), c = mk(Math.max(1, iw(img) * k | 0), Math.max(1, ih(img) * k | 0)), g = c.getContext('2d');
+  g.drawImage(img, 0, 0, c.width, c.height);
+  const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i] < 250) n++;
+  return n > d.length / 4 * 0.01;
+}
+let bgBusy = false, TF = null;
+const SEGMENTERS = {};
+const BG_MODELS = {
+  person: { id: 'Xenova/modnet', opts: { dtype: 'q8' } },
+  any: { id: 'onnx-community/BiRefNet_lite-ONNX', opts: { device: 'webgpu', dtype: 'fp16' } },
+};
+function bgStatus(text) { document.getElementById('bgState').textContent = text || ''; }
+async function removeBackground(kind) {
+  const t = selTile(); if (!t || t.kind === 'text' || bgBusy) return;
+  bgBusy = true; syncSel(); bgStatus('Loading…');
+  try {
+    TF = TF || await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1/dist/transformers.min.js');
+    if (!SEGMENTERS[kind]) {
+      const files = {};
+      SEGMENTERS[kind] = await TF.pipeline('background-removal', BG_MODELS[kind].id, { ...BG_MODELS[kind].opts, progress_callback: e => {
+        if (e.status !== 'progress' || !e.total) return;
+        files[e.file] = [e.loaded, e.total];
+        const [l, tot] = Object.values(files).reduce((a, b) => [a[0] + b[0], a[1] + b[1]], [0, 0]);
+        bgStatus(`Downloading ${Math.round(l / tot * 100)}%`);
+      } });
+    }
+    bgStatus('Cutting out…');
+    const src = t.orig ? t.orig.img : t.img, c = mk(iw(src), ih(src));
+    c.getContext('2d').drawImage(src, 0, 0);
+    const raw = await TF.RawImage.fromBlob(await new Promise(r => c.toBlob(r, 'image/png')));
+    const out = await SEGMENTERS[kind](raw), res = Array.isArray(out) ? out[0] : out;
+    const rc = res.toCanvas(), plain = mk(rc.width, rc.height);
+    plain.getContext('2d').drawImage(rc, 0, 0);
+    applyCutout(t, plain);
+  } catch (err) {
+    console.error(err);
+    say(`Couldn't remove the background: ${err && err.message || err}`, { error: true });
+  } finally { bgBusy = false; bgStatus(''); syncSel(); }
+}
+// Swap the layer's image for the cut-out subject, trimmed and kept exactly where it was on the canvas.
+function applyCutout(t, cutCanvas) {
+  const trimmed = trimAlpha(cutCanvas);
+  if (!trimmed) { say('No subject found in this image.', { error: true }); return; }
+  if (!t.orig) t.orig = { img: t.img, x: t.x, y: t.y, w: t.w, h: t.h, zoom: t.zoom, fx: t.fx, fy: t.fy, shape: t.shape };
+  const o = t.orig, ox = t.rx - t.x, oy = t.ry - t.y;
+  const frame = { ...o, kind: 'image', fit: t.fit, img: o.img, rot: t.rot, rx: o.x + ox, ry: o.y + oy, _rot: undefined };
+  const k = geom(frame), b = trimmed.box;
+  const u0 = k.dx + (b[0] - k.sx) * k.s, v0 = k.dy + (b[1] - k.sy) * k.s, u1 = k.dx + (b[2] - k.sx) * k.s, v1 = k.dy + (b[3] - k.sy) * k.s;
+  const [cx, cy] = toWorld(frame, (u0 + u1) / 2, (v0 + v1) / 2);
+  Object.assign(t, { img: trimmed.canvas, w: u1 - u0, h: v1 - v0, zoom: 1, fx: 0, fy: 0, fit: 'cover', shape: 'rect' });
+  t.x = cx - ox - t.w / 2; t.y = cy - oy - t.h / 2; t.rx = t.x + ox; t.ry = t.y + oy; t.ver++;
+  renderLayers(); requestRender();
+  say('Background removed. Only the subject overlaps now.');
+}
+function restoreBackground() {
+  const t = selTile(); if (!t || !t.orig) return;
+  Object.assign(t, t.orig); t.orig = null; t.rx = t.x; t.ry = t.y; t.ver++;
+  renderLayers(); requestRender();
+}
+document.getElementById('bgPerson').addEventListener('click', () => removeBackground('person'));
+document.getElementById('bgAny').addEventListener('click', () => removeBackground('any'));
+document.getElementById('bgRestore').addEventListener('click', restoreBackground);
 
 // ---------- text layers ----------
 const FONTS = {
@@ -1617,12 +1743,18 @@ function loadFiles(files) {
     const img = new Image();
     img.onload = () => {
       const g = S.grid, n = S.tiles.length;
-      let w = snapV(S.W * 0.5), h = snapV(w * ih(img) / iw(img));
-      if (h > S.H * 0.6) { h = snapV(S.H * 0.6); w = snapV(h * iw(img) / ih(img)); }
+      let src = img, cutout = false;
+      if (hasTransparency(img)) {
+        const c = mk(iw(img), ih(img)); c.getContext('2d').drawImage(img, 0, 0);
+        const tr = trimAlpha(c); if (tr) { src = tr.canvas; cutout = true; }
+      }
+      let w = snapV(S.W * 0.5), h = snapV(w * ih(src) / iw(src));
+      if (h > S.H * 0.6) { h = snapV(S.H * 0.6); w = snapV(h * iw(src) / ih(src)); }
       w = Math.max(minDim(), w); h = Math.max(minDim(), h);
       const x = snapV(clamp((S.W - w) / 2 + ((n % 3) - 1) * g * 2, 0, S.W - w));
       const y = snapV(clamp((S.H - h) / 2 + ((n % 4) - 1.5) * g, 0, S.H - h));
-      const t = addTile(img, f.name.replace(/\.[^.]+$/, ''), x, y, w, h);
+      const t = addTile(src, f.name.replace(/\.[^.]+$/, ''), x, y, w, h);
+      if (cutout) { t.fit = 'contain'; say('Transparent image added as a cutout. Only its visible pixels overlap.'); }
       showTab('images'); select(t.id);
     };
     img.src = URL.createObjectURL(f);

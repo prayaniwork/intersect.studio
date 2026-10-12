@@ -10,6 +10,15 @@ Everything runs in your browser. Images never leave your device, and there's not
 
 ## What it does
 
+- **Overlaps follow the real pixels:** transparent PNGs, rotated layers, shaped frames and letterforms all shape where the effect appears.
+- **Text layers:** five typefaces with weight, italic, size, letter spacing, line height, alignment and color. Text cuts through images by default (where letters cross an image they become the effect), or sits on top as normal type.
+- **Cutouts:** transparent PNGs are trimmed to their subject automatically. **Remove background** runs on your device: Person (7 MB) or Any subject (115 MB, needs WebGPU). The model downloads once.
+- **Frame shapes:** rectangle, rounded, circle, pill, arch, diamond and star.
+- **Rotation:** drag the round handle (Shift snaps to 15°) or use the slider.
+- **Layer motion:** Slide, Pass, Orbit, Bounce, Sway, Spin and Pulse, each with amount, direction, start offset and speed. Everything loops seamlessly.
+- **Per-overlap control:** click an S label (or pick it from the Overlaps list) to give one overlap its own style, cell size or colors, or switch its effect off.
+- **Looks:** seven built-in looks (Signal, Image colors, Terminal, Riso, Blueprint, Newsprint, Gold braille), plus your own saved looks.
+- **Projects:** save the whole poster, images included, as a `.intersect` file and open it later.
 - **16 overlap styles:** Dots, ASCII, Waves, Vectors, Truchet, Bars, Crosses, Squares, Braille, Blocks, Dither, Hex, LED, Hatch, RGB drops and Rings. Areas where three images overlap can switch to the next style automatically.
 - **5 ways to combine images:** Shape × Color, Top layer, Plus, Minus and Difference.
 - **Color:**
@@ -25,21 +34,24 @@ Everything runs in your browser. Images never leave your device, and there's not
   - Figma-style grid lines (never exported)
   - Background dots
 - **Cropping:** double-click an image to crop it on the canvas. Drag to reposition and scroll to zoom.
-- **Export:** PNG at full resolution, or a seamlessly looping video. You can download, copy, or share to WhatsApp and Instagram.
+- **Export:** PNG at full resolution, or an MP4 rendered frame by frame (30 or 60 fps) that loops seamlessly. You can download, copy, or share to WhatsApp and Instagram.
 
 ## Layout
 
 - **Left panel:** Effect and Motion (styles, blend modes, effect controls, finish, animation and recording).
 - **Center:** the poster.
-- **Right panel:** Images and Color (layers, cropping, mark colors, surfaces).
-- **Top bar:** canvas size, grid settings, Record loop and Export.
+- **Left panel:** looks live at the top of the Effect tab.
+- **Right panel:** Layers and Color (layers, text, cropping, shapes, background removal, layer motion, overlaps, mark colors, surfaces).
+- **Top bar:** canvas size, grid settings, Open and Save, Export MP4 and Export PNG.
 
 ## Keyboard
 
 | Key | Action |
 | --- | --- |
-| Arrow keys | Nudge the selected image by one grid cell |
-| Enter | Start or finish cropping |
+| Arrow keys | Nudge the selected layer by one grid cell |
+| Enter | Crop an image, or edit a text layer |
+| Shift while rotating | Snap to 15° |
+| Shift while resizing | Keep proportions |
 | Esc | Finish cropping, deselect, close dialogs |
 | Delete / Backspace | Remove the selected image |
 

@@ -219,6 +219,18 @@ input[type=range]::-moz-range-thumb { width: 10px; height: 14px; background: var
 .selcard select { appearance: none; -webkit-appearance: none; cursor: pointer; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 28px; }
 .selcard textarea:focus, .selcard select:focus { outline: none; border-color: var(--fg); }
 .seg button:disabled { opacity: 0.35; cursor: default; }
+.sizebtn.plain::after { display: none; }
+.looks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.look { display: flex; align-items: center; gap: 8px; min-width: 0; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 8px; cursor: pointer; color: var(--muted); font-size: 12px; text-align: left; transition: transform 160ms var(--ease-out), border-color 150ms ease, color 150ms ease; }
+.look:active { transform: scale(0.97); }
+.look .sw { flex: none; width: 22px; height: 14px; border-radius: 2px; box-shadow: 0 0 0 1px var(--line-2); }
+.look .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.look .x { flex: none; color: var(--dim); padding: 0 2px; }
+.lookrow input, .panel input[type=text] { flex: 1; min-width: 0; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r); color: var(--fg); padding: 6px 10px; font: 12.5px var(--font-ui); }
+.lookrow input:focus { outline: none; border-color: var(--fg); }
+.ovrow .nm b { font-family: var(--font-label); }
+.ovrow .tag2 { font-family: var(--font-mono); font-size: 10.5px; color: var(--dim); }
+@media (hover: hover) and (pointer: fine) { .look:hover { border-color: var(--line-2); color: var(--fg); } .look .x:hover { color: var(--fg); } }
 
 .layers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 .layer { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 2px; border-bottom: 1px solid var(--line); cursor: pointer; transition: background-color 150ms ease; }
@@ -360,6 +372,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
         </section>
       </div>
     </div>
+    <span class="hdiv" aria-hidden="true"></span>
+    <button class="sizebtn plain" id="openProj" type="button" title="Open a saved .intersect project">Open</button>
+    <button class="sizebtn plain" id="saveProj" type="button" title="Save this poster as a .intersect project file">Save</button>
+    <input type="file" id="projFile" accept=".intersect,application/json" hidden>
     <span class="spacer"></span>
     <button class="btn vid" id="recordBtn" type="button">Export MP4</button>
     <button class="btn primary" id="export" type="button">Export PNG</button>
@@ -372,6 +388,11 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
       <span class="tab-ind no-anim" aria-hidden="true"></span>
     </div>
     <div class="panel" role="tabpanel" id="p-effect" aria-labelledby="tab-effect">
+      <section>
+        <div class="sec-title"><span>Looks</span></div>
+        <div class="looks" id="looks"></div>
+        <div class="row lookrow"><input id="lookName" type="text" maxlength="24" placeholder="Name this look" aria-label="Look name"><button class="btn small" id="saveLook" type="button">Save look</button></div>
+      </section>
 
       <section>
         <div class="sec-title"><span>Overlap style</span></div>
@@ -597,9 +618,36 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
         </div>
       </section>
 
+      <section id="ovSel" hidden>
+        <div class="sec-title"><span>Selected overlap</span></div>
+        <div class="selcard">
+          <div class="head"><b id="ovCode">S01</b><span id="ovName"></span></div>
+          <div class="field"><span class="lbl">Effect</span>
+            <div class="seg" id="ovOn" style="--cols:2"><button type="button" data-v="on">On</button><button type="button" data-v="off">Off · show images</button></div>
+          </div>
+          <div class="field"><label for="ovStyle">Style</label><select id="ovStyle"><option value="">Same as everywhere</option><option value="dots">Dots</option><option value="ascii">ASCII</option><option value="waves">Waves</option><option value="vectors">Vectors</option><option value="truchet">Truchet</option><option value="bars">Bars</option><option value="crosses">Crosses</option><option value="squares">Squares</option><option value="braille">Braille</option><option value="blocks">Blocks</option><option value="dither">Dither</option><option value="hex">Hex</option><option value="led">LED</option><option value="hatch">Hatch</option><option value="rgb">RGB drops</option><option value="rings">Rings</option></select></div>
+          <label class="check"><input type="checkbox" id="ovCellOwn"><span>Own cell size</span></label>
+          <div class="field indent" id="ovCellF"><label for="ovCell">Cell size <span class="val" id="ovCellV"></span></label><input id="ovCell" type="range" min="4" max="120"></div>
+          <div class="field"><span class="lbl">Colors</span>
+            <div class="seg" id="ovColor" style="--cols:3"><button type="button" data-v="">Global</button><button type="button" data-v="two">Two-tone</button><button type="button" data-v="source">From images</button></div>
+          </div>
+          <div class="field" id="ovTwo" hidden>
+            <div class="colorrow"><span class="swatch"><input type="color" id="ovHi" aria-label="Bright cells color for this overlap"></span><span class="lbl">Bright cells</span><code id="ovHiV"></code></div>
+            <div class="colorrow"><span class="swatch"><input type="color" id="ovLo" aria-label="Dim cells color for this overlap"></span><span class="lbl">Dim cells</span><code id="ovLoV"></code></div>
+          </div>
+          <div class="row"><button class="btn small" id="ovReset" type="button">Use global settings</button></div>
+        </div>
+      </section>
+
       <section>
         <div class="sec-title"><span>Layers</span><span id="count">0</span></div>
         <ul class="layers" id="layers"></ul>
+      </section>
+
+      <section id="ovSection" hidden>
+        <div class="sec-title"><span>Overlaps</span><span id="ovCount"></span></div>
+        <ul class="layers" id="ovList"></ul>
+        <p class="note">Click an overlap here, or its S label on the canvas, to give it its own style, cell size or colors.</p>
       </section>
     </div>
     <div class="panel" role="tabpanel" id="p-color" aria-labelledby="tab-color" hidden>
@@ -732,7 +780,7 @@ const S = {
   backdrop: '#121013', bg: '#000000', dotColor: '#3a3a40',
   motion: 'breathe', motionAmt: 55, loop: 6, hop: 0, playing: true,
   scanFx: 0, rgbFx: 0, grainFx: 0, vigFx: 0, fps: '30',
-  tiles: [], sel: null, crop: null,
+  tiles: [], sel: null, crop: null, ovr: {}, selOv: null,
 };
 let nextId = 1;
 
@@ -920,6 +968,8 @@ function covering(x, y) {
 // Where do layers really overlap? Scan the candidate area at `step` px and build:
 // a backdrop mask for the overlap shape, the area to draw marks in, and one labelled region per overlapping pair.
 let maskCanvas = null;
+// an overlap is named by the two layers that make it, regardless of order
+const ovKey = (a, b) => a < b ? `${a}-${b}` : `${b}-${a}`;
 function computeOverlaps(step) {
   const T = S.tiles.filter(cuts), B = T.map(aabb), pairs = [];
   for (let i = 0; i < T.length; i++) for (let j = i + 1; j < T.length; j++) {
@@ -930,14 +980,17 @@ function computeOverlaps(step) {
   const U = pairs.reduce((u, q) => ({ x0: Math.min(u.x0, q.x0), y0: Math.min(u.y0, q.y0), x1: Math.max(u.x1, q.x1), y1: Math.max(u.y1, q.y1) }), { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity });
   const mw = Math.max(1, Math.ceil((U.x1 - U.x0) / step)), mh = Math.max(1, Math.ceil((U.y1 - U.y0) / step));
   const img = new ImageData(mw, mh), d = img.data, pairOf = new Map(pairs.map((q, k) => [q.i * 64 + q.j, q]));
-  let any = false;
+  let any = false, anyMask = false;
   for (let my = 0; my < mh; my++) {
     const y = U.y0 + (my + 0.5) * step;
     for (let mx = 0; mx < mw; mx++) {
       const x = U.x0 + (mx + 0.5) * step, cov = [];
       for (let k = 0; k < T.length; k++) if (x >= B[k].x0 && x <= B[k].x1 && y >= B[k].y0 && y <= B[k].y1 && covers(T[k], x, y)) cov.push(k);
       if (cov.length < 2) continue;
-      any = true; d[(my * mw + mx) * 4 + 3] = 255;
+      any = true;
+      // an overlap switched off shows the plain images, so it gets no backdrop
+      const o = S.ovr[ovKey(T[cov[cov.length - 1]].id, T[cov[cov.length - 2]].id)];
+      if (!(o && o.off)) { anyMask = true; d[(my * mw + mx) * 4 + 3] = 255; }
       for (let a = 0; a < cov.length; a++) for (let b = a + 1; b < cov.length; b++) {
         const q = pairOf.get(cov[a] * 64 + cov[b]); if (!q) continue;
         q.b[0] = Math.min(q.b[0], x - step / 2); q.b[1] = Math.min(q.b[1], y - step / 2); q.b[2] = Math.max(q.b[2], x + step / 2); q.b[3] = Math.max(q.b[3], y + step / 2);
@@ -948,8 +1001,9 @@ function computeOverlaps(step) {
   if (!maskCanvas || maskCanvas.width !== mw || maskCanvas.height !== mh) maskCanvas = mk(mw, mh);
   maskCanvas.getContext('2d').putImageData(img, 0, 0);
   // labelled regions are image-on-image overlaps; letters crossing images speak for themselves
-  const regions = pairs.filter(q => q.b[2] > q.b[0] && T[q.i].kind !== 'text' && T[q.j].kind !== 'text').map(q => ({ x: q.b[0], y: q.b[1], w: q.b[2] - q.b[0], h: q.b[3] - q.b[1] }));
-  return { regions, area: U, mask: maskCanvas };
+  const regions = pairs.filter(q => q.b[2] > q.b[0] && T[q.i].kind !== 'text' && T[q.j].kind !== 'text')
+    .map(q => ({ x: q.b[0], y: q.b[1], w: q.b[2] - q.b[0], h: q.b[3] - q.b[1], key: ovKey(T[q.i].id, T[q.j].id), a: T[q.i], b: T[q.j] }));
+  return { regions, area: anyMask ? U : null, mask: maskCanvas };
 }
 
 // ---------- combining + color ----------
@@ -990,8 +1044,16 @@ function buildLut() {
     LUT[i] = rgba(c);
   }
 }
+let MARK_LUT;   // undefined: global colours · null: colours from the images · array: this overlap's own colours
+const OV_LUTS = new Map();
+function lutFor(o) {
+  const k = `${o.hi}|${o.lo}`;
+  if (!OV_LUTS.has(k)) { const hi = rgba(hex2rgb(o.hi)), lo = rgba(hex2rgb(o.lo)); OV_LUTS.set(k, Array.from({ length: 256 }, (_, i) => i / 255 > 0.3 ? hi : lo)); }
+  return OV_LUTS.get(k);
+}
 function markColor(col, v) {
-  if (LUT) return LUT[(v * 255) | 0];
+  const lut = MARK_LUT === undefined ? LUT : MARK_LUT;
+  if (lut) return lut[(v * 255) | 0];
   const m = Math.max(col[0], col[1], col[2], 0.001), k = m < 0.65 ? 0.65 / m : 1;
   return rgba([clamp(col[0] * k) * 255, clamp(col[1] * k) * 255, clamp(col[2] * k) * 255]);
 }
@@ -1238,26 +1300,44 @@ function render(editing) {
     ctx.font = `500 ${Math.round(s * 1.05)}px "Geist Mono", ui-monospace, monospace`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineCap = 'round';
     const bx0 = ov.area.x0, by0 = ov.area.y0, bx1 = ov.area.x1, by1 = ov.area.y1;
-    const base = STYLES.indexOf(S.style), thr = S.threshold / 100;
+    const base = STYLES.indexOf(S.style), thr = S.threshold / 100, keyOf = L => ovKey(L[0].id, L[1].id);
+    const cell = (L, cx, cy, sz, gx, gy, o) => {
+      const { v, col } = cellV(L, cx, cy); if (v < thr) return;
+      const style = (o && o.style) || (S.depthVary ? STYLES[(base + L.length - 2) % STYLES.length] : S.style);
+      MARK_LUT = o && o.colorMode ? (o.colorMode === 'source' ? null : lutFor(o)) : undefined;
+      drawMark(style, cx, cy, sz, v, col, gx, gy, L);
+    };
     for (let gy = Math.floor(by0 / s); gy * s < by1; gy++) {
       for (let gx = Math.floor(bx0 / s); gx * s < bx1; gx++) {
         const cx = gx * s + s / 2, cy = gy * s + s / 2;
         const L = covering(cx, cy);
         if (L.length < 2) continue;
-        const { v, col } = cellV(L, cx, cy);
-        if (v < thr) continue;
-        const style = S.depthVary ? STYLES[(base + L.length - 2) % STYLES.length] : S.style;
-        drawMark(style, cx, cy, s, v, col, gx, gy, L);
+        const o = S.ovr[keyOf(L)];
+        if (o && (o.off || o.cell)) continue;
+        cell(L, cx, cy, s, gx, gy, o);
       }
     }
+    // overlaps with their own cell size get their own grid
+    for (const r of rects) {
+      const o = S.ovr[r.key]; if (!o || o.off || !o.cell) continue;
+      const s2 = o.cell; ctx.font = `500 ${Math.round(s2 * 1.05)}px "Geist Mono", ui-monospace, monospace`;
+      for (let gy = Math.floor(r.y / s2); gy * s2 < r.y + r.h; gy++) for (let gx = Math.floor(r.x / s2); gx * s2 < r.x + r.w; gx++) {
+        const cx = gx * s2 + s2 / 2, cy = gy * s2 + s2 / 2, L = covering(cx, cy);
+        if (L.length < 2 || keyOf(L) !== r.key) continue;
+        cell(L, cx, cy, s2, gx, gy, o);
+      }
+    }
+    MARK_LUT = undefined;
     ctx.restore();
   }
 
   // text that doesn't cut through sits on top of everything, as normal type
   for (const t of S.tiles) if (!cuts(t)) drawTile(ctx, t);
 
-  if (S.guides) drawGuides(rects);
+  lastRegions = rects;
+  if (S.guides) drawGuides(rects, editing); else chipHits = [];
   finish();
+  if (editing) renderOverlapList();
   if (editing) { drawEditorOverlay(); syncFrame(); }
 }
 
@@ -1323,6 +1403,8 @@ function drawEditorOverlay() {
     ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fill(minor);
     if (S.major > 1 && M < Math.max(W, H)) { ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fill(major); }
   }
+  const ovSelR = S.selOv && lastRegions.find(r => r.key === S.selOv);
+  if (ovSelR) { const ui = uiScale(); ctx.strokeStyle = '#7fe3c4'; ctx.lineWidth = 2 * ui; ctx.setLineDash([6 * ui, 5 * ui]); ctx.strokeRect(ovSelR.x, ovSelR.y, ovSelR.w, ovSelR.h); ctx.setLineDash([]); }
   const t = selTile();
   if (!t) return;
   const ui = uiScale();
@@ -1357,13 +1439,17 @@ function chip(text, x, y, opts = {}) {
   ctx.font = `500 ${fs}px "Geist Mono", ui-monospace, monospace`;
   const pad = fs * 0.45, w = ctx.measureText(text).width + pad * 2, h = fs * 1.5;
   const bx = opts.alignRight ? x - w : x;
-  ctx.fillStyle = 'rgba(14,14,16,0.92)'; ctx.fillRect(bx, y, w, h);
+  ctx.fillStyle = opts.fill || 'rgba(14,14,16,0.92)'; ctx.fillRect(bx, y, w, h);
   if (opts.border) { ctx.strokeStyle = opts.border; ctx.lineWidth = 1.5; ctx.strokeRect(bx + 0.75, y + 0.75, w - 1.5, h - 1.5); }
-  ctx.fillStyle = '#eceaee'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = opts.color || '#eceaee'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   ctx.fillText(text, bx + pad, y + h / 2 + 1);
+  opts.box && (opts.box.w = w, opts.box.h = h);
   return h;
 }
-function drawGuides(rects) {
+let lastRegions = [], chipHits = [];
+const ovLabel = (r, i) => `S${String(i + 1).padStart(2, '0')}${S.ovr[r.key] ? '◆' : ''}`;
+function drawGuides(rects, editing) {
+  chipHits = [];
   const { W, H } = S;
   ctx.globalAlpha = 1;
   ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1.2; ctx.setLineDash([6, 7]);
@@ -1389,7 +1475,9 @@ function drawGuides(rects) {
     const y = [r.y - ch - 2, r.y + 4, r.y + r.h + 4].find(y => !clash(r.x, y));
     if (y === undefined) return;
     placed.push([r.x, y]);
-    chip(`S${String(i + 1).padStart(2, '0')}`, r.x, y, { border: mint });
+    const sel = editing && S.selOv === r.key, box = {};
+    chip(ovLabel(r, i), r.x, y, sel ? { fill: '#f3f1f4', color: '#0a0a0a', box } : { border: mint, box });
+    chipHits.push({ x: r.x, y, w: box.w, h: box.h, key: r.key });
     ctx.fillStyle = mint;
     ctx.fillRect(r.x - sq / 2, r.y - sq / 2, sq, sq);
     ctx.fillRect(r.x + r.w - sq / 2, r.y + r.h - sq / 2, sq, sq);
@@ -1430,7 +1518,9 @@ function hit(p) {
 }
 let drag = null;
 cv.addEventListener('pointerdown', e => {
-  const p = toPoster(e), h = hit(p);
+  const p = toPoster(e);
+  if (!S.crop) { const c = chipHits.find(q => p.x >= q.x && p.x <= q.x + q.w && p.y >= q.y && p.y <= q.y + q.h); if (c) { selectOverlap(c.key); return; } }
+  const h = hit(p);
   if (!h) { if (S.crop) exitCrop(); else select(null); return; }
   if (S.sel !== h.t.id) select(h.t.id);
   const t = h.t, k = geom(t), cx = t.rx + t.w / 2, cy = t.ry + t.h / 2;
@@ -1441,7 +1531,10 @@ cv.addEventListener('pointerdown', e => {
 });
 cv.addEventListener('pointermove', e => {
   const p = toPoster(e);
-  if (!drag) { const h = hit(p); cv.style.cursor = h ? cursorFor(h.mode, h.t) : 'default'; return; }
+  if (!drag) {
+    if (chipHits.some(q => p.x >= q.x && p.x <= q.x + q.w && p.y >= q.y && p.y <= q.y + q.h)) { cv.style.cursor = 'pointer'; return; }
+    const h = hit(p); cv.style.cursor = h ? cursorFor(h.mode, h.t) : 'default'; return;
+  }
   const t = drag.t, o = drag.o, m = drag.mode, md = minDim();
   if (m === 'move') {
     t.x = clamp(snapV(o.x + p.x - drag.px), -t.w + md, S.W - md);
@@ -1512,7 +1605,7 @@ cv.addEventListener('wheel', e => {
 
 function enterCrop(id) { const t = S.tiles.find(q => q.id === id); if (!t || t.kind === 'text') return; S.sel = id; S.crop = id; renderLayers(); requestRender(); }
 function exitCrop() { S.crop = null; renderLayers(); requestRender(); }
-function select(id) { S.sel = id; if (S.crop && S.crop !== id) S.crop = null; renderLayers(); requestRender(); }
+function select(id) { S.sel = id; S.selOv = null; if (S.crop && S.crop !== id) S.crop = null; renderLayers(); syncOv(); requestRender(); }
 
 document.addEventListener('keydown', e => {
   if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
@@ -1529,7 +1622,12 @@ document.addEventListener('keydown', e => {
 
 // ---------- images panel ----------
 const layersEl = document.getElementById('layers');
-function removeTile(id) { S.tiles = S.tiles.filter(t => t.id !== id); if (S.sel === id) S.sel = null; if (S.crop === id) S.crop = null; renderLayers(); requestRender(); }
+function removeTile(id) {
+  S.tiles = S.tiles.filter(t => t.id !== id); if (S.sel === id) S.sel = null; if (S.crop === id) S.crop = null;
+  for (const k of Object.keys(S.ovr)) if (k.split('-').includes(String(id))) delete S.ovr[k];
+  if (S.selOv && !S.ovr[S.selOv] && S.selOv.split('-').includes(String(id))) S.selOv = null;
+  renderLayers(); syncOv(); requestRender();
+}
 function moveZ(id, dir) {
   const i = S.tiles.findIndex(t => t.id === id), j = i + dir;
   if (j < 0 || j >= S.tiles.length) return;
@@ -1866,9 +1964,11 @@ document.getElementById('shuffle').addEventListener('click', () => {
 });
 
 // ---------- generic controls ----------
+const CONTROLS = [];
 function seg(id, key, onChange) {
   const el = document.getElementById(id);
   const sync = () => el.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(String(S[key]) === b.dataset.v)));
+  CONTROLS.push(sync);
   el.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     S[key] = b.dataset.v; sync(); onChange && onChange(); requestRender();
@@ -1880,10 +1980,11 @@ function slider(id, key, fmt, onChange) {
   const el = document.getElementById(id), out = document.getElementById(id + 'V');
   const show = () => { el.value = S[key]; out.textContent = fmt(S[key]); paintRange(el); };
   el.addEventListener('input', () => { S[key] = Number(el.value); out.textContent = fmt(S[key]); paintRange(el); onChange && onChange(); requestRender(); });
-  show(); return show;
+  CONTROLS.push(show); show(); return show;
 }
 function check(id, key) {
   const el = document.getElementById(id); el.checked = S[key];
+  CONTROLS.push(() => { el.checked = S[key]; });
   el.addEventListener('change', () => { S[key] = el.checked; requestRender(); });
 }
 seg('style', 'style'); seg('blend', 'blend');
@@ -1920,7 +2021,7 @@ function colorInput(id, key, onChange) {
   const el = document.getElementById(id), code = document.getElementById(id + 'V');
   const show = () => { el.value = S[key]; if (code) code.textContent = S[key]; };
   el.addEventListener('input', () => { S[key] = el.value; if (code) code.textContent = el.value; onChange && onChange(); requestRender(); });
-  show(); return show;
+  CONTROLS.push(show); show(); return show;
 }
 const showHi = colorInput('hi', 'hi', buildLut), showLo = colorInput('lo', 'lo', buildLut);
 const showSingle = colorInput('single', 'single', buildLut);
@@ -2191,6 +2292,165 @@ function liveRecord() {
 }
 document.getElementById('recordBtn').addEventListener('click', exportVideo);
 document.getElementById('recordBtn2').addEventListener('click', exportVideo);
+// ---------- per-overlap control ----------
+const ovEl = id => document.getElementById(id);
+function selectOverlap(key) {
+  S.selOv = key; S.sel = null; S.crop = null;
+  showTab('images'); renderLayers(); syncOv(); requestRender();
+}
+function ovOf(key) { return S.ovr[key] || null; }
+function editOv(fn) {
+  const k = S.selOv; if (!k) return;
+  const o = S.ovr[k] || (S.ovr[k] = {});
+  fn(o);
+  if (!o.off && !o.style && !o.cell && !o.colorMode) delete S.ovr[k];   // nothing custom left
+  syncOv(); listKey = ''; requestRender();
+}
+function syncOv() {
+  const k = S.selOv, i = lastRegions.findIndex(r => r.key === k), r = lastRegions[i];
+  ovEl('ovSel').hidden = !k;
+  if (!k) return;
+  const o = ovOf(k) || {};
+  ovEl('ovCode').textContent = r ? `S${String(i + 1).padStart(2, '0')}` : 'S';
+  ovEl('ovName').textContent = r ? `${codeOf(r.a)} × ${codeOf(r.b)} · ${r.a.name} and ${r.b.name}` : 'These layers no longer overlap';
+  ovEl('ovOn').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((o.off ? 'off' : 'on') === b.dataset.v)));
+  ovEl('ovStyle').value = o.style || '';
+  ovEl('ovCellOwn').checked = !!o.cell; ovEl('ovCellF').hidden = !o.cell;
+  ovEl('ovCell').value = o.cell || S.cell; ovEl('ovCellV').textContent = `${o.cell || S.cell} px`; paintRange(ovEl('ovCell'));
+  ovEl('ovColor').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((o.colorMode || '') === b.dataset.v)));
+  ovEl('ovTwo').hidden = o.colorMode !== 'two';
+  ovEl('ovHi').value = o.hi || S.hi; ovEl('ovHiV').textContent = o.hi || S.hi;
+  ovEl('ovLo').value = o.lo || S.lo; ovEl('ovLoV').textContent = o.lo || S.lo;
+  ['ovStyle', 'ovCellOwn', 'ovCell'].forEach(id => ovEl(id).disabled = !!o.off);
+}
+ovEl('ovOn').addEventListener('click', e => { const b = e.target.closest('button'); if (b) editOv(o => { if (b.dataset.v === 'off') o.off = true; else delete o.off; }); });
+ovEl('ovStyle').addEventListener('change', e => editOv(o => { if (e.target.value) o.style = e.target.value; else delete o.style; }));
+ovEl('ovCellOwn').addEventListener('change', e => editOv(o => { if (e.target.checked) o.cell = S.cell; else delete o.cell; }));
+ovEl('ovCell').addEventListener('input', e => editOv(o => { o.cell = +e.target.value; }));
+ovEl('ovColor').addEventListener('click', e => { const b = e.target.closest('button'); if (b) editOv(o => { if (b.dataset.v) { o.colorMode = b.dataset.v; o.hi = o.hi || S.hi; o.lo = o.lo || S.lo; } else { delete o.colorMode; delete o.hi; delete o.lo; } }); });
+ovEl('ovHi').addEventListener('input', e => editOv(o => { o.hi = e.target.value; }));
+ovEl('ovLo').addEventListener('input', e => editOv(o => { o.lo = e.target.value; }));
+ovEl('ovReset').addEventListener('click', () => { if (S.selOv) { delete S.ovr[S.selOv]; syncOv(); listKey = ''; requestRender(); } });
+// the overlaps list follows the canvas; it only rebuilds when the set of overlaps (or their settings) changes
+let listKey = '';
+function renderOverlapList() {
+  const key = lastRegions.map(r => r.key + (S.ovr[r.key] ? JSON.stringify(S.ovr[r.key]) : '')).join('|') + '#' + S.selOv + '#' + S.tiles.map(t => t.name).join('|');
+  if (key === listKey) return;
+  listKey = key;
+  const list = ovEl('ovList'); list.innerHTML = '';
+  ovEl('ovSection').hidden = !lastRegions.length;
+  ovEl('ovCount').textContent = `${lastRegions.length}`;
+  lastRegions.forEach((r, i) => {
+    const o = S.ovr[r.key], li = document.createElement('li');
+    li.className = 'layer ovrow' + (S.selOv === r.key ? ' sel' : '');
+    const th = mk(72, 72), g = th.getContext('2d'); g.fillStyle = '#121013'; g.fillRect(0, 0, 72, 72);
+    g.fillStyle = o && o.off ? '#3a3a40' : '#7fe3c4'; for (let y = 9; y < 72; y += 12) for (let x = 9; x < 72; x += 12) { g.beginPath(); g.arc(x, y, 3.2, 0, TAU); g.fill(); }
+    const nm = document.createElement('div'); nm.className = 'nm';
+    const b = document.createElement('b'); b.textContent = `S${String(i + 1).padStart(2, '0')}`;
+    nm.append(b, `${codeOf(r.a)} × ${codeOf(r.b)}`);
+    const tag = document.createElement('span'); tag.className = 'tag2';
+    tag.textContent = !o ? 'global' : o.off ? 'off' : [o.style, o.cell && `${o.cell}px`, o.colorMode === 'two' ? 'own colors' : o.colorMode === 'source' ? 'image colors' : ''].filter(Boolean).join(' · ') || 'custom';
+    li.append(th, nm, tag);
+    li.onclick = () => selectOverlap(r.key);
+    list.append(li);
+  });
+  syncOv();
+}
+
+// ---------- looks ----------
+const LOOK_KEYS = ['style', 'depthVary', 'blend', 'amount', 'cell', 'threshold', 'contrast', 'invert', 'colorMode', 'hi', 'lo', 'single', 'stops', 'backdrop', 'bg', 'dotColor',
+  'motion', 'motionAmt', 'loop', 'hop', 'scanFx', 'rgbFx', 'grainFx', 'vigFx'];
+const BUILTIN_LOOKS = [
+  { name: 'Signal', look: { style: 'dots', blend: 'shape', colorMode: 'two', hi: '#f59ad3', lo: '#7fe3c4', backdrop: '#121013', bg: '#000000', contrast: 130, threshold: 6, cell: 16, scanFx: 0, rgbFx: 0, grainFx: 0, vigFx: 0 } },
+  { name: 'Image colors', look: { style: 'dots', blend: 'shape', colorMode: 'source', contrast: 220, threshold: 42, cell: 10, backdrop: '#121013', bg: '#000000', scanFx: 0, rgbFx: 0, grainFx: 0, vigFx: 0 } },
+  { name: 'Terminal', look: { style: 'ascii', blend: 'top', colorMode: 'single', single: '#7dff8a', backdrop: '#030a04', bg: '#000000', contrast: 160, threshold: 10, cell: 14, scanFx: 55, rgbFx: 18, grainFx: 25, vigFx: 40 } },
+  { name: 'Riso', look: { style: 'dither', blend: 'shape', colorMode: 'gradient', stops: ['#1d1a6b', '#ff4f7b', '#ffd25a'], backdrop: '#f2ede2', bg: '#f2ede2', dotColor: '#d8d0c0', contrast: 150, threshold: 4, cell: 10, scanFx: 0, rgbFx: 0, grainFx: 45, vigFx: 0 } },
+  { name: 'Blueprint', look: { style: 'hatch', blend: 'shape', colorMode: 'two', hi: '#eaf2ff', lo: '#5d8be0', backdrop: '#0b2a6b', bg: '#071d4d', dotColor: '#2a4f9a', contrast: 170, threshold: 12, cell: 14, scanFx: 0, rgbFx: 0, grainFx: 15, vigFx: 20 } },
+  { name: 'Newsprint', look: { style: 'dots', blend: 'top', colorMode: 'single', single: '#151412', invert: true, backdrop: '#ece6d8', bg: '#ece6d8', dotColor: '#cfc6b3', contrast: 140, threshold: 8, cell: 9, scanFx: 0, rgbFx: 0, grainFx: 35, vigFx: 0 } },
+  { name: 'Gold braille', look: { style: 'braille', blend: 'shape', colorMode: 'gradient', stops: ['#3a2a10', '#c9933a', '#fff1c9'], backdrop: '#0d0b08', bg: '#000000', contrast: 170, threshold: 10, cell: 12, scanFx: 0, rgbFx: 0, grainFx: 20, vigFx: 30 } },
+];
+const pick = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined).map(k => [k, Array.isArray(o[k]) ? [...o[k]] : o[k]]));
+let savedLooks = []; try { savedLooks = JSON.parse(localStorage.getItem('intersect-looks') || '[]'); } catch {}
+const persistLooks = () => { try { localStorage.setItem('intersect-looks', JSON.stringify(savedLooks)); } catch {} };
+function swatchOf(l) {
+  const c = l.colorMode === 'gradient' ? l.stops : l.colorMode === 'single' ? [l.single, l.single] : l.colorMode === 'source' ? ['#e8b04a', '#7fbf5a', '#4b7bd6'] : [l.hi, l.lo];
+  return `linear-gradient(90deg, ${(c || ['#888', '#444']).join(',')})`;
+}
+function syncControls() { CONTROLS.forEach(f => f()); showColorMode(); renderStops(); buildLut(); showMotionNote(); OV_LUTS.clear(); if (!recording && !exporting) setVidLabels(); }
+function applyLook(look) {
+  Object.assign(S, { depthVary: false, invert: false }, pick(look, LOOK_KEYS));
+  syncControls(); requestRender();
+}
+function renderLooks() {
+  const box = document.getElementById('looks'); box.innerHTML = '';
+  [...BUILTIN_LOOKS.map(l => ({ ...l, builtin: true })), ...savedLooks].forEach((l, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'look';
+    const sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = swatchOf({ ...S, ...l.look });
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = l.name;
+    b.append(sw, nm); b.title = `Apply the ${l.name} look`;
+    if (!l.builtin) {
+      const x = document.createElement('span'); x.className = 'x'; x.textContent = '×'; x.title = `Delete ${l.name}`; x.setAttribute('role', 'button');
+      x.onclick = ev => { ev.stopPropagation(); savedLooks = savedLooks.filter(q => q !== l); persistLooks(); renderLooks(); say(`Deleted ${l.name}.`); };
+      b.append(x);
+    }
+    b.onclick = () => { applyLook(l.look); say(`${l.name} look applied.`); };
+    box.append(b);
+  });
+}
+document.getElementById('saveLook').addEventListener('click', () => {
+  const inp = document.getElementById('lookName'), name = inp.value.trim() || `Look ${savedLooks.length + 1}`;
+  savedLooks.push({ name, look: pick(S, LOOK_KEYS) }); persistLooks(); renderLooks(); inp.value = '';
+  say(`Saved "${name}". It stays in this browser.`);
+});
+document.getElementById('lookName').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('saveLook').click(); });
+renderLooks();
+
+// ---------- project files (.intersect: settings, layers with their images, overlap settings) ----------
+const LAYER_KEYS = ['id', 'kind', 'name', 'x', 'y', 'w', 'h', 'rot', 'fit', 'shape', 'zoom', 'fx', 'fy', 'anim', 'text', 'font', 'weight', 'italic', 'size', 'track', 'lead', 'align', 'color', 'cut'];
+const PROJECT_KEYS = ['W', 'H', 'grid', 'snap', 'lines', 'major', 'dots', 'dotSize', 'guides', 'fps', ...LOOK_KEYS];
+function imageData(img) {
+  const c = mk(iw(img), ih(img)); c.getContext('2d').drawImage(img, 0, 0);
+  const webp = c.toDataURL('image/webp', 0.92);
+  return webp.startsWith('data:image/webp') ? webp : c.toDataURL('image/png');
+}
+function saveProject() {
+  const data = { app: 'intersect', version: 1, settings: pick(S, PROJECT_KEYS), ovr: S.ovr,
+    layers: S.tiles.map(t => ({ ...pick(t, LAYER_KEYS), anim: { ...(t.anim || newAnim()) }, src: t.kind === 'text' ? undefined : imageData(t.img) })) };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' }), a = document.createElement('a'), url = URL.createObjectURL(blob);
+  a.href = url; a.download = `intersect-${S.W}x${S.H}.intersect`; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  say('Project saved. Open it any time with Open.');
+}
+const loadImage = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('An image in the project could not be read.')); i.src = src; });
+async function openProject(file) {
+  let data;
+  try { data = JSON.parse(await file.text()); } catch { say('That file is not an Intersect project.', { error: true }); return; }
+  if (!data || data.app !== 'intersect' || !Array.isArray(data.layers)) { say('That file is not an Intersect project.', { error: true }); return; }
+  try {
+    const st = data.settings || {}, idMap = {};
+    const tiles = [];
+    for (const L of data.layers) {
+      const t = { ...pick(L, LAYER_KEYS), id: nextId++, ver: 0, cache: null, anim: { ...newAnim(), ...(L.anim || {}) } };
+      idMap[L.id] = t.id;
+      if (t.kind === 'text') { t.img = null; await document.fonts.load(fontOf(t)).catch(() => {}); const cx = t.x + t.w / 2, cy = t.y + t.h / 2; layoutText(t); t.x = cx - t.w / 2; t.y = cy - t.h / 2; }
+      else t.img = await loadImage(L.src);
+      t.rx = t.x; t.ry = t.y; tiles.push(t);
+    }
+    Object.assign(S, pick(st, PROJECT_KEYS));
+    S.W = cv.width = st.W || S.W; S.H = cv.height = st.H || S.H; noisePat = null;
+    document.getElementById('sizeLabel').textContent = `${S.W} × ${S.H}`;
+    document.getElementById('ratioLabel').textContent = ratioLabel(S.W, S.H);
+    S.tiles = tiles; S.sel = null; S.selOv = null; S.crop = null;
+    S.ovr = {};
+    for (const [k, v] of Object.entries(data.ovr || {})) { const [a, b] = k.split('-').map(n => idMap[n]); if (a && b) S.ovr[ovKey(a, b)] = v; }
+    closeSize(true); syncControls(); renderLayers(); syncOv(); listKey = ''; requestRender();
+    say(`Opened ${file.name}.`);
+  } catch (err) { console.error(err); say(`Couldn't open the project: ${err.message || err}`, { error: true }); }
+}
+document.getElementById('saveProj').addEventListener('click', saveProject);
+document.getElementById('openProj').addEventListener('click', () => document.getElementById('projFile').click());
+document.getElementById('projFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) openProject(f); });
+
 // ---------- boot ----------
 function addSamples() {
   const sx = S.W / 1080, sy = S.H / 1350, md = minDim();
